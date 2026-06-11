@@ -1,278 +1,363 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import {
   Store, ShoppingBag, BarChart2, LogOut, Plus, Edit3,
-  Trash2, Check, X, Clock, ChevronRight, Home,
-  TrendingUp, Star, Package, ToggleLeft, ToggleRight, Bell
+  Trash2, Check, X, Clock, Home, TrendingUp, Star,
+  Package, ToggleLeft, ToggleRight, User, MapPin,
+  Camera, ChevronRight, AlertCircle, Utensils,
+  DollarSign, Eye, EyeOff, RefreshCw
 } from 'lucide-react';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
-  ArcElement, Title, Tooltip, Legend
+  Title, Tooltip, Legend
 } from 'chart.js';
 import logoUrl from '../assets/logo.png';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const API = 'http://localhost:5000/api';
 
-const statusColors = {
-  pending:    { bg: '#fff7ed', color: '#c2410c', label: 'En attente' },
-  preparing:  { bg: '#fefce8', color: '#a16207', label: 'En préparation' },
-  on_the_way: { bg: '#eff6ff', color: '#1d4ed8', label: 'En route' },
-  delivered:  { bg: '#f0fdf4', color: '#15803d', label: 'Livré' },
-  cancelled:  { bg: '#fef2f2', color: '#b91c1c', label: 'Annulé' },
+const C = {
+  red: '#A51C1C', dark: '#111', bg: '#F4F6FB',
+  border: '#EEF0F6', muted: '#94A3B8', text: '#1C1C2E', sub: '#64748B',
+  card: '#FFFFFF',
+};
+
+const STATUS = {
+  pending:    { bg: '#FFF7ED', color: '#C2410C', dot: '#F97316', label: 'En attente' },
+  preparing:  { bg: '#FEFCE8', color: '#A16207', dot: '#EAB308', label: 'En préparation' },
+  on_the_way: { bg: '#EFF6FF', color: '#1D4ED8', dot: '#3B82F6', label: 'En route' },
+  delivered:  { bg: '#F0FDF4', color: '#15803D', dot: '#22C55E', label: 'Livré' },
+  cancelled:  { bg: '#FEF2F2', color: '#B91C1C', dot: '#EF4444', label: 'Annulé' },
 };
 
 const inputStyle = {
-  width: '100%', padding: '12px 16px', borderRadius: '10px',
-  border: '1.5px solid #e5e7eb', fontSize: '14px', outline: 'none',
-  background: '#fafafa', boxSizing: 'border-box',
+  width: '100%', padding: '11px 14px', borderRadius: '10px',
+  border: `1.5px solid ${C.border}`, fontSize: '13px', outline: 'none',
+  background: '#FAFBFD', boxSizing: 'border-box', fontFamily: 'Outfit,sans-serif',
+  color: C.text, transition: 'border .15s',
 };
 
+/* ── Image upload helper ── */
+const ImageUpload = ({ value, onChange, height = 140, placeholder = 'Ajouter une image' }) => {
+  const ref = useRef();
+  const handle = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Max 5 Mo'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div onClick={() => ref.current.click()} style={{
+      width: '100%', height, borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
+      border: `2px dashed ${value ? C.red : C.border}`, position: 'relative',
+      background: value ? 'transparent' : '#FAFBFD', transition: 'border .2s',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = C.red}
+      onMouseLeave={e => e.currentTarget.style.borderColor = value ? C.red : C.border}
+    >
+      {value
+        ? <>
+            <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: '.2s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = 1}
+              onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+              <Camera size={24} color="#fff" />
+            </div>
+          </>
+        : <div style={{ textAlign: 'center', pointerEvents: 'none' }}>
+            <Camera size={26} color={C.muted} style={{ marginBottom: 6 }} />
+            <p style={{ margin: 0, fontSize: 12, color: C.muted, fontWeight: 600 }}>{placeholder}</p>
+            <p style={{ margin: '3px 0 0', fontSize: 11, color: C.muted }}>JPG / PNG — max 5 Mo</p>
+          </div>
+      }
+      <input ref={ref} type="file" accept="image/*" onChange={handle} style={{ display: 'none' }} />
+    </div>
+  );
+};
+
+/* ── Status badge ── */
+const StatusBadge = ({ status }) => {
+  const s = STATUS[status] || { bg: '#f5f5f5', color: '#888', dot: '#aaa', label: status };
+  return (
+    <span style={{ background: s.bg, color: s.color, padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+      {s.label}
+    </span>
+  );
+};
+
+/* ── Stat card ── */
+const StatCard = ({ label, value, color, icon: Icon, sub }) => (
+  <div style={{ background: C.card, borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', display: 'flex', gap: 14, alignItems: 'center' }}>
+    <div style={{ width: 44, height: 44, borderRadius: 12, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon size={20} color={color} />
+    </div>
+    <div>
+      <p style={{ margin: 0, fontSize: 11, color: C.muted, fontWeight: 600 }}>{label}</p>
+      <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 900, color: C.text, lineHeight: 1 }}>{value}</p>
+      {sub && <p style={{ margin: '2px 0 0', fontSize: 11, color: C.muted }}>{sub}</p>}
+    </div>
+  </div>
+);
+
 export default function RestaurantDashboard() {
-  const [tab, setTab] = useState('orders');
-  const [restaurant, setRestaurant] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [menu, setMenu] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showItemForm, setShowItemForm] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [showRestaurantForm, setShowRestaurantForm] = useState(false);
-  const [itemForm, setItemForm] = useState({ name: '', description: '', price: '', category: '', image_url: '' });
-  const [restoForm, setRestoForm] = useState({});
-  const [msg, setMsg] = useState('');
+  const [tab, setTab]                         = useState('orders');
+  const [restaurant, setRestaurant]           = useState(null);
+  const [orders, setOrders]                   = useState([]);
+  const [menu, setMenu]                       = useState([]);
+  const [stats, setStats]                     = useState(null);
+  const [loading, setLoading]                 = useState(false);
+  const [menuLoading, setMenuLoading]         = useState(false);
+
+  // Modals
+  const [itemModal, setItemModal]             = useState(false);
+  const [editItem, setEditItem]               = useState(null);
+  const [infoModal, setInfoModal]             = useState(false);
+
+  // Forms
+  const [itemForm, setItemForm]               = useState({ name: '', description: '', price: '', category: '', image_url: '', isAvailable: true });
+  const [restoForm, setRestoForm]             = useState({});
+
+  // Feedback
+  const [msg, setMsg]                         = useState({ text: '', ok: true });
+  const [savingItem, setSavingItem]           = useState(false);
+  const [savingResto, setSavingResto]         = useState(false);
+
+  // Filter
+  const [orderFilter, setOrderFilter]         = useState('all');
+  const [menuSearch, setMenuSearch]           = useState('');
+
   const navigate = useNavigate();
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const token    = localStorage.getItem('token');
+  const user     = JSON.parse(localStorage.getItem('user') || '{}');
+  const headers  = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
-    if (!token || !['restaurant', 'admin'].includes(user.role)) {
-      navigate('/login');
-      return;
-    }
-    fetchRestaurant();
+    if (!token || !['restaurant', 'admin'].includes(user.role)) { navigate('/login'); return; }
+    init();
   }, []);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const notify = (text, ok = true) => { setMsg({ text, ok }); setTimeout(() => setMsg({ text: '', ok: true }), 3000); };
 
-  const fetchRestaurant = async () => {
+  const init = async () => {
     try {
       const { data } = await axios.get(`${API}/restaurant-dashboard/my-restaurant`, { headers });
       setRestaurant(data);
       if (data) {
-        setRestoForm({ name: data.name, description: data.description, address: data.address, city: data.city, cuisine: data.cuisine, image_url: data.image_url });
-        fetchOrders(data.id);
-        fetchMenu(data.id);
-        fetchStats(data.id);
+        setRestoForm({ name: data.name, description: data.description || '', address: data.address || '', city: data.city || '', cuisine: data.cuisine || '', image_url: data.image_url || '' });
+        loadOrders(data.id);
+        loadMenu(data.id);
+        loadStats(data.id);
       }
     } catch { navigate('/login'); }
   };
 
-  const fetchOrders = async (id) => {
+  const loadOrders = async (id) => {
     setLoading(true);
-    try {
-      const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/orders`, { headers });
-      setOrders(data);
-    } catch { setOrders([]); }
+    try { const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/orders`, { headers }); setOrders(data); }
+    catch { setOrders([]); }
     setLoading(false);
   };
 
-  const fetchMenu = async (id) => {
-    try {
-      const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/menu`, { headers });
-      setMenu(data);
-    } catch { setMenu([]); }
+  const loadMenu = async (id) => {
+    setMenuLoading(true);
+    try { const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/menu`, { headers }); setMenu(data); }
+    catch { setMenu([]); }
+    setMenuLoading(false);
   };
 
-  const fetchStats = async (id) => {
-    try {
-      const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/stats`, { headers });
-      setStats(data);
-    } catch { setStats(null); }
+  const loadStats = async (id) => {
+    try { const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/stats`, { headers }); setStats(data); }
+    catch { setStats(null); }
   };
 
   const handleOrderStatus = async (orderId, status) => {
     try {
       await axios.put(`${API}/restaurant-dashboard/${restaurant.id}/orders/${orderId}/status`, { status }, { headers });
-      fetchOrders(restaurant.id);
-      if (status === 'preparing') fetchStats(restaurant.id);
-    } catch (err) {
-      alert(err.response?.data?.message || 'Error');
-    }
+      loadOrders(restaurant.id);
+      loadStats(restaurant.id);
+    } catch (err) { notify(err.response?.data?.message || 'Erreur', false); }
   };
 
-  const handleToggleStatus = async () => {
+  const handleToggle = async () => {
     try {
       await axios.put(`${API}/restaurant-dashboard/${restaurant.id}/toggle-status`, {}, { headers });
       setRestaurant(r => ({ ...r, isOpen: !r.isOpen }));
-    } catch (err) {
-      alert('Error toggling status');
-    }
+    } catch { notify('Erreur', false); }
+  };
+
+  const openItemModal = (item = null) => {
+    setEditItem(item);
+    setItemForm(item
+      ? { name: item.name, description: item.description || '', price: item.price, category: item.category || '', image_url: item.image_url || '', isAvailable: item.isAvailable }
+      : { name: '', description: '', price: '', category: '', image_url: '', isAvailable: true }
+    );
+    setItemModal(true);
   };
 
   const handleSaveItem = async (e) => {
     e.preventDefault();
+    setSavingItem(true);
     try {
       if (editItem) {
         await axios.put(`${API}/restaurant-dashboard/${restaurant.id}/menu/${editItem.id}`, itemForm, { headers });
-        setMsg('Item updated!');
+        notify('Plat mis à jour');
       } else {
         await axios.post(`${API}/restaurant-dashboard/${restaurant.id}/menu`, itemForm, { headers });
-        setMsg('Item added!');
+        notify('Plat ajouté');
       }
-      setShowItemForm(false);
-      setEditItem(null);
-      setItemForm({ name: '', description: '', price: '', category: '', image_url: '' });
-      fetchMenu(restaurant.id);
-    } catch (err) {
-      setMsg(err.response?.data?.message || 'Error');
-    }
-    setTimeout(() => setMsg(''), 3000);
+      setItemModal(false);
+      loadMenu(restaurant.id);
+      loadStats(restaurant.id);
+    } catch (err) { notify(err.response?.data?.message || 'Erreur', false); }
+    setSavingItem(false);
   };
 
   const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Delete this item?')) return;
-    await axios.delete(`${API}/restaurant-dashboard/${restaurant.id}/menu/${itemId}`, { headers });
-    fetchMenu(restaurant.id);
-  };
-
-  const handleSaveRestaurant = async (e) => {
-    e.preventDefault();
+    if (!window.confirm('Supprimer ce plat ?')) return;
     try {
-      await axios.put(`${API}/restaurant-dashboard/${restaurant.id}`, restoForm, { headers });
-      setMsg('Restaurant updated!');
-      fetchRestaurant();
-      setShowRestaurantForm(false);
-    } catch (err) {
-      setMsg('Error updating restaurant');
-    }
-    setTimeout(() => setMsg(''), 3000);
+      await axios.delete(`${API}/restaurant-dashboard/${restaurant.id}/menu/${itemId}`, { headers });
+      notify('Plat supprimé');
+      loadMenu(restaurant.id);
+      loadStats(restaurant.id);
+    } catch { notify('Erreur', false); }
   };
 
-  const handleCreateRestaurant = async (e) => {
+  const handleSaveResto = async (e) => {
     e.preventDefault();
+    setSavingResto(true);
     try {
-      await axios.post(`${API}/restaurant-dashboard/create`, restoForm, { headers });
-      setMsg('Restaurant created!');
-      fetchRestaurant();
-      setShowRestaurantForm(false);
-    } catch (err) {
-      setMsg(err.response?.data?.message || 'Error');
-    }
-    setTimeout(() => setMsg(''), 3000);
+      if (restaurant) {
+        await axios.put(`${API}/restaurant-dashboard/${restaurant.id}`, restoForm, { headers });
+        notify('Informations mises à jour');
+        init();
+      } else {
+        await axios.post(`${API}/restaurant-dashboard/create`, restoForm, { headers });
+        notify('Restaurant créé');
+        init();
+      }
+      setInfoModal(false);
+    } catch (err) { notify(err.response?.data?.message || 'Erreur', false); }
+    setSavingResto(false);
   };
 
-  const pendingOrders = orders.filter(o => o.status === 'pending');
-  const activeOrders = orders.filter(o => ['preparing', 'on_the_way'].includes(o.status));
+  // Derived
+  const pendingOrders  = orders.filter(o => o.status === 'pending');
+  const activeOrders   = orders.filter(o => ['preparing', 'on_the_way'].includes(o.status));
+  const filteredOrders = orderFilter === 'all' ? orders : orders.filter(o => o.status === orderFilter);
+  const filteredMenu   = menu.filter(m => m.name.toLowerCase().includes(menuSearch.toLowerCase()) || (m.category || '').toLowerCase().includes(menuSearch.toLowerCase()));
+  const categories     = [...new Set(menu.map(m => m.category).filter(Boolean))];
 
-  const TABS = [
-    { id: 'orders', label: 'Commandes', icon: <ShoppingBag size={16} /> },
-    { id: 'menu',   label: 'Menu',      icon: <Store size={16} /> },
-    { id: 'stats',  label: 'Stats',     icon: <BarChart2 size={16} /> },
-  ];
-
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const monthlyData = stats?.monthly || [];
-  const revenueByMonth = {
+  // Chart
+  const months   = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const chartData = {
     labels: months,
     datasets: [{
-      label: 'Revenus (MAD)',
-      data: months.map((_, i) => {
-        const m = monthlyData.find(x => x.month === i + 1);
-        return m ? Number(m.revenue) : 0;
-      }),
-      backgroundColor: '#A51C1C',
-      borderRadius: 8,
+      data: months.map((_, i) => { const m = stats?.monthly?.find(x => x.month === i + 1); return m ? Number(m.revenue) : 0; }),
+      backgroundColor: months.map((_, i) => i === new Date().getMonth() ? C.red : C.red + '55'),
+      borderRadius: 8, borderSkipped: false,
     }],
   };
 
+  const NAV = [
+    { id: 'orders', label: 'Commandes', icon: ShoppingBag },
+    { id: 'menu',   label: 'Menu',      icon: Utensils },
+    { id: 'stats',  label: 'Statistiques', icon: BarChart2 },
+  ];
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f5f7', display: 'flex' }}>
-      {/* SIDEBAR */}
-      <div style={{ width: '240px', background: '#111', minHeight: '100vh', padding: '24px 16px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <img src={logoUrl} alt="SpeedMeal" style={{ height: '60px', objectFit: 'contain' }} />
-          <p style={{ margin: '6px 0 0', color: '#888', fontSize: '11px', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase' }}>Restaurant</p>
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', fontFamily: 'Outfit,sans-serif' }}>
+
+      {/* ── SIDEBAR ── */}
+      <aside style={{ width: 220, background: C.dark, minHeight: '100vh', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+        <div style={{ padding: '24px 16px 16px', borderBottom: '1px solid #222' }}>
+          <img src={logoUrl} alt="SpeedMeal" style={{ height: 40, objectFit: 'contain', display: 'block', margin: '0 auto 12px' }} />
+          {restaurant && (
+            <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '12px 14px' }}>
+              {restaurant.image_url
+                ? <img src={restaurant.image_url} alt="" style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
+                : <div style={{ width: '100%', height: 70, background: '#222', borderRadius: 8, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Store size={28} color="#444"/></div>
+              }
+              <p style={{ margin: 0, color: '#fff', fontWeight: 800, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{restaurant.name}</p>
+              <p style={{ margin: '2px 0 8px', color: '#666', fontSize: 11 }}>{restaurant.city} · {restaurant.cuisine}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1, textAlign: 'center', padding: '4px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, background: restaurant.isOpen ? '#14532d' : '#3f1010', color: restaurant.isOpen ? '#4ade80' : '#f87171' }}>
+                  {restaurant.isOpen ? 'Ouvert' : 'Fermé'}
+                </span>
+                <button onClick={handleToggle} title="Basculer statut" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', padding: 4 }}>
+                  {restaurant.isOpen ? <ToggleRight size={22} color="#4ade80" /> : <ToggleLeft size={22} color="#555" />}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {restaurant && (
-          <div style={{ background: '#1a1a1a', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
-            <p style={{ margin: 0, color: '#fff', fontWeight: '700', fontSize: '13px' }}>{restaurant.name}</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-              <span style={{
-                padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: '700',
-                background: restaurant.isOpen ? '#dcfce7' : '#fee2e2',
-                color: restaurant.isOpen ? '#15803d' : '#b91c1c'
-              }}>
-                {restaurant.isOpen ? 'Ouvert' : 'Fermé'}
-              </span>
-              <button onClick={handleToggleStatus} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', display: 'flex' }}>
-                {restaurant.isOpen ? <ToggleRight size={22} color="#22c55e" /> : <ToggleLeft size={22} color="#888" />}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '12px 14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-              fontWeight: '700', fontSize: '13px', textAlign: 'left',
-              background: tab === t.id ? '#A51C1C' : 'transparent',
-              color: tab === t.id ? '#fff' : '#888',
+        <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {NAV.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setTab(id)} style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '11px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              fontWeight: 700, fontSize: 13, textAlign: 'left', fontFamily: 'Outfit,sans-serif',
+              background: tab === id ? C.red : 'transparent',
+              color: tab === id ? '#fff' : '#888', transition: 'all .18s', position: 'relative',
             }}>
-              {t.icon} {t.label}
-              {t.id === 'orders' && pendingOrders.length > 0 && (
-                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', borderRadius: '999px', fontSize: '10px', fontWeight: '800', padding: '2px 7px' }}>
+              <Icon size={16} strokeWidth={tab === id ? 2.5 : 2} />
+              {label}
+              {id === 'orders' && pendingOrders.length > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', borderRadius: 999, fontSize: 10, fontWeight: 800, padding: '2px 7px', flexShrink: 0 }}>
                   {pendingOrders.length}
                 </span>
               )}
             </button>
           ))}
-
-          {restaurant && (
-            <button onClick={() => { setShowRestaurantForm(true); }} style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '12px 14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-              fontWeight: '700', fontSize: '13px', textAlign: 'left',
-              background: 'transparent', color: '#888',
-            }}>
-              <Edit3 size={16} /> Modifier info
-            </button>
-          )}
+          <button onClick={() => setInfoModal(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13, background: 'transparent', color: '#888',
+            fontFamily: 'Outfit,sans-serif', transition: 'all .18s',
+          }}>
+            <Edit3 size={16} /> {restaurant ? 'Modifier infos' : 'Créer restaurant'}
+          </button>
         </nav>
 
-        <div style={{ borderTop: '1px solid #222', paddingTop: '16px' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', color: '#888', textDecoration: 'none', fontWeight: '700', fontSize: '13px' }}>
+        <div style={{ padding: '12px 10px', borderTop: '1px solid #222' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', color: '#888', textDecoration: 'none', fontWeight: 700, fontSize: 13, borderRadius: 10 }}>
             <Home size={16} /> Accueil
           </Link>
           <button onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/'); }}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', color: '#ef4444', padding: '12px 14px', cursor: 'pointer', fontWeight: '700', fontSize: '13px', width: '100%', textAlign: 'left' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', color: '#ef4444', fontWeight: 700, fontSize: 13, cursor: 'pointer', borderRadius: 10, fontFamily: 'Outfit,sans-serif' }}>
             <LogOut size={16} /> Déconnexion
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* MAIN */}
-      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
-        {msg && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', padding: '12px 20px', borderRadius: '12px', marginBottom: '20px', fontWeight: '700' }}>
-            {msg}
-          </div>
-        )}
+      {/* ── MAIN ── */}
+      <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto', minWidth: 0 }}>
 
-        {/* No restaurant yet */}
+        {/* Feedback toast */}
+        <AnimatePresence>
+          {msg.text && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              style={{ background: msg.ok ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${msg.ok ? '#86EFAC' : '#FECACA'}`, color: msg.ok ? '#15803D' : '#DC2626', padding: '12px 20px', borderRadius: 12, marginBottom: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {msg.ok ? <Check size={16}/> : <AlertCircle size={16}/>} {msg.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* No restaurant */}
         {!restaurant && (
-          <div style={{ background: '#fff', borderRadius: '24px', padding: '60px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
-            <Store size={60} color="#ddd" style={{ marginBottom: '20px' }} />
-            <h2 style={{ margin: '0 0 12px', color: '#111', fontWeight: '900' }}>Créez votre restaurant</h2>
-            <p style={{ color: '#888', marginBottom: '28px' }}>Vous n'avez pas encore de restaurant enregistré.</p>
-            <button onClick={() => setShowRestaurantForm(true)} style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: '999px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
+          <div style={{ background: C.card, borderRadius: 24, padding: '60px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+            <Store size={60} color="#ddd" style={{ marginBottom: 20 }} />
+            <h2 style={{ margin: '0 0 10px', color: C.text, fontWeight: 900 }}>Créez votre restaurant</h2>
+            <p style={{ color: C.muted, marginBottom: 28 }}>Votre compte a été approuvé. Configurez maintenant votre restaurant.</p>
+            <button onClick={() => setInfoModal(true)} style={{ background: C.red, color: '#fff', border: 'none', padding: '14px 32px', borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontSize: 15, boxShadow: `0 6px 20px ${C.red}40` }}>
               + Créer mon restaurant
             </button>
           </div>
@@ -280,67 +365,84 @@ export default function RestaurantDashboard() {
 
         {restaurant && (
           <AnimatePresence mode="wait">
-            {/* ORDERS TAB */}
+
+            {/* ══════════════ COMMANDES ══════════════ */}
             {tab === 'orders' && (
-              <motion.div key="orders" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ margin: 0, fontWeight: '900', fontSize: '22px', color: '#111' }}>Commandes</h2>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{ background: '#fff7ed', color: '#c2410c', padding: '8px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '700' }}>
-                      {pendingOrders.length} en attente
-                    </div>
-                    <div style={{ background: '#eff6ff', color: '#1d4ed8', padding: '8px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '700' }}>
-                      {activeOrders.length} actives
-                    </div>
+              <motion.div key="orders" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                  <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22, color: C.text }}>Commandes</h2>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { id: 'all', label: 'Toutes' },
+                      { id: 'pending', label: `En attente${pendingOrders.length ? ` (${pendingOrders.length})` : ''}` },
+                      { id: 'preparing', label: 'Préparation' },
+                      { id: 'delivered', label: 'Livrées' },
+                      { id: 'cancelled', label: 'Annulées' },
+                    ].map(f => (
+                      <button key={f.id} onClick={() => setOrderFilter(f.id)} style={{
+                        padding: '7px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 12,
+                        fontWeight: 700, fontFamily: 'Outfit,sans-serif',
+                        background: orderFilter === f.id ? C.red : C.card,
+                        color: orderFilter === f.id ? '#fff' : C.sub,
+                        boxShadow: orderFilter === f.id ? `0 4px 12px ${C.red}40` : '0 1px 4px rgba(0,0,0,0.06)',
+                      }}>
+                        {f.label}
+                      </button>
+                    ))}
+                    <button onClick={() => loadOrders(restaurant.id)} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.border}`, background: C.card, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
+                      <RefreshCw size={14}/>
+                    </button>
                   </div>
                 </div>
 
                 {loading ? (
-                  <p style={{ color: '#aaa', textAlign: 'center' }}>Chargement...</p>
-                ) : orders.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: '20px', padding: '60px', textAlign: 'center' }}>
-                    <ShoppingBag size={40} color="#ddd" />
-                    <p style={{ color: '#aaa', marginTop: '12px' }}>Aucune commande pour l'instant</p>
+                  <div style={{ textAlign: 'center', padding: 60, color: C.muted }}>Chargement...</div>
+                ) : filteredOrders.length === 0 ? (
+                  <div style={{ background: C.card, borderRadius: 20, padding: 60, textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <ShoppingBag size={44} color="#ddd" style={{ marginBottom: 12 }} />
+                    <p style={{ color: C.muted, fontWeight: 600 }}>Aucune commande</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {orders.map(order => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {filteredOrders.map(order => (
                       <motion.div key={order.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                        style={{ background: '#fff', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', border: `2px solid ${order.status === 'pending' ? '#fed7aa' : '#f0f0f0'}` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                          <div>
-                            <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '15px' }}>
-                              Commande #{order.id} — <span style={{ color: '#A51C1C' }}>{Number(order.total_price).toFixed(2)} MAD</span>
-                            </p>
-                            <p style={{ margin: '4px 0', color: '#666', fontSize: '13px' }}>👤 {order.client_name} {order.client_phone && `· ${order.client_phone}`}</p>
-                            <p style={{ margin: '4px 0', color: '#888', fontSize: '12px' }}>📍 {order.address}</p>
-                            {order.items?.map(item => (
-                              <span key={item.id} style={{ display: 'inline-block', background: '#f9f9f9', border: '1px solid #eee', borderRadius: '6px', padding: '3px 10px', fontSize: '12px', margin: '2px', color: '#555' }}>
-                                {item.quantity}× {item.item_name}
+                        style={{ background: C.card, borderRadius: 16, padding: '18px 22px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', borderLeft: `4px solid ${STATUS[order.status]?.dot || '#eee'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 900, fontSize: 15, color: C.text }}>Commande #{order.id}</span>
+                              <span style={{ fontWeight: 900, fontSize: 15, color: C.red }}>{Number(order.total_price).toFixed(2)} MAD</span>
+                              <StatusBadge status={order.status} />
+                              <span style={{ color: C.muted, fontSize: 11, marginLeft: 'auto' }}>
+                                {new Date(order.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                               </span>
-                            ))}
-                            {order.note && <p style={{ margin: '6px 0 0', color: '#888', fontSize: '12px', fontStyle: 'italic' }}>Note: {order.note}</p>}
+                            </div>
+                            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: C.sub }}><User size={13}/>{order.client_name}{order.client_phone && ` · ${order.client_phone}`}</span>
+                              {order.address && <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: C.sub }}><MapPin size={13}/>{order.address.substring(0, 50)}</span>}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                              {order.items?.map(item => (
+                                <span key={item.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 12, color: C.sub }}>
+                                  {item.quantity}× {item.item_name}
+                                </span>
+                              ))}
+                            </div>
+                            {order.note && <p style={{ margin: '6px 0 0', color: C.muted, fontSize: 12, fontStyle: 'italic' }}>Note: {order.note}</p>}
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                            <span style={{ background: statusColors[order.status]?.bg, color: statusColors[order.status]?.color, padding: '5px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700' }}>
-                              {statusColors[order.status]?.label || order.status}
-                            </span>
-                            <p style={{ margin: 0, color: '#bbb', fontSize: '12px' }}>
-                              {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            {order.status === 'pending' && (
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button onClick={() => handleOrderStatus(order.id, 'preparing')}
-                                  style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', padding: '8px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <Check size={14} /> Accepter
-                                </button>
-                                <button onClick={() => handleOrderStatus(order.id, 'cancelled')}
-                                  style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '8px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <X size={14} /> Refuser
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          {order.status === 'pending' && (
+                            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                              <button onClick={() => handleOrderStatus(order.id, 'preparing')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', color: '#15803D', border: '1.5px solid #BBF7D0', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <Check size={14}/> Accepter
+                              </button>
+                              <button onClick={() => handleOrderStatus(order.id, 'cancelled')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', color: '#DC2626', border: '1.5px solid #FECACA', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <X size={14}/> Refuser
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     ))}
@@ -349,48 +451,78 @@ export default function RestaurantDashboard() {
               </motion.div>
             )}
 
-            {/* MENU TAB */}
+            {/* ══════════════ MENU ══════════════ */}
             {tab === 'menu' && (
-              <motion.div key="menu" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 style={{ margin: 0, fontWeight: '900', fontSize: '22px', color: '#111' }}>Menu ({menu.length} plats)</h2>
-                  <button onClick={() => { setEditItem(null); setItemForm({ name: '', description: '', price: '', category: '', image_url: '' }); setShowItemForm(true); }}
-                    style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
-                    <Plus size={16} /> Ajouter un plat
-                  </button>
+              <motion.div key="menu" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                  <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22, color: C.text }}>Menu <span style={{ color: C.muted, fontWeight: 600, fontSize: 16 }}>({menu.length} plats)</span></h2>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <input value={menuSearch} onChange={e => setMenuSearch(e.target.value)} placeholder="Rechercher..."
+                      style={{ ...inputStyle, width: 180, padding: '8px 12px' }} />
+                    <button onClick={() => openItemModal()} style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.red, color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: 'Outfit,sans-serif', boxShadow: `0 4px 14px ${C.red}40` }}>
+                      <Plus size={15}/> Ajouter un plat
+                    </button>
+                  </div>
                 </div>
 
-                {menu.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: '20px', padding: '60px', textAlign: 'center' }}>
-                    <p style={{ color: '#aaa' }}>Aucun plat dans votre menu</p>
+                {/* Category filter */}
+                {categories.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+                    {categories.map(cat => (
+                      <button key={cat} onClick={() => setMenuSearch(cat === menuSearch ? '' : cat)}
+                        style={{ padding: '6px 14px', borderRadius: 999, border: `1.5px solid ${menuSearch === cat ? C.red : C.border}`, background: menuSearch === cat ? C.red + '12' : C.card, color: menuSearch === cat ? C.red : C.sub, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {menuLoading ? (
+                  <div style={{ textAlign: 'center', padding: 60, color: C.muted }}>Chargement...</div>
+                ) : filteredMenu.length === 0 ? (
+                  <div style={{ background: C.card, borderRadius: 20, padding: 60, textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <Utensils size={44} color="#ddd" style={{ marginBottom: 12 }} />
+                    <p style={{ color: C.muted, fontWeight: 600 }}>Aucun plat dans le menu</p>
+                    <button onClick={() => openItemModal()} style={{ marginTop: 16, background: C.red, color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 999, fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
+                      + Ajouter le premier plat
+                    </button>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                    {menu.map(item => (
-                      <motion.div key={item.id} whileHover={{ y: -3 }}
-                        style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', opacity: item.isAvailable ? 1 : 0.6 }}>
-                        {item.image_url && (
-                          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
-                        )}
-                        <div style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                              <p style={{ margin: 0, fontWeight: '800', fontSize: '15px', color: '#111' }}>{item.name}</p>
-                              <p style={{ margin: '3px 0', color: '#888', fontSize: '12px' }}>{item.category}</p>
-                              <p style={{ margin: '6px 0 0', color: '#A51C1C', fontWeight: '900', fontSize: '16px' }}>{Number(item.price).toFixed(2)} MAD</p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button onClick={() => { setEditItem(item); setItemForm({ name: item.name, description: item.description || '', price: item.price, category: item.category, image_url: item.image_url || '', isAvailable: item.isAvailable }); setShowItemForm(true); }}
-                                style={{ background: '#f0f4ff', color: '#3b82f6', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Edit3 size={14} />
-                              </button>
-                              <button onClick={() => handleDeleteItem(item.id)}
-                                style={{ background: '#fef2f2', color: '#b91c1c', border: 'none', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(270px,1fr))', gap: 16 }}>
+                    {filteredMenu.map(item => (
+                      <motion.div key={item.id} whileHover={{ y: -3 }} transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                        style={{ background: C.card, borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', opacity: item.isAvailable ? 1 : 0.55, position: 'relative' }}>
+                        {/* Image */}
+                        <div style={{ height: 150, overflow: 'hidden', background: C.bg, position: 'relative' }}>
+                          {item.image_url
+                            ? <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Utensils size={36} color={C.muted} style={{ opacity: .4 }}/></div>
+                          }
+                          {/* Availability badge */}
+                          <span style={{ position: 'absolute', top: 8, left: 8, background: item.isAvailable ? '#15803D' : '#DC2626', color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff' }}/>
+                            {item.isAvailable ? 'Disponible' : 'Indisponible'}
+                          </span>
+                          {/* Actions overlay */}
+                          <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 5 }}>
+                            <button onClick={() => openItemModal(item)} style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                              <Edit3 size={13} color="#3B82F6"/>
+                            </button>
+                            <button onClick={() => handleDeleteItem(item.id)} style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                              <Trash2 size={13} color="#DC2626"/>
+                            </button>
                           </div>
-                          {item.description && <p style={{ margin: '8px 0 0', color: '#aaa', fontSize: '12px', lineHeight: 1.5 }}>{item.description.substring(0, 60)}...</p>}
+                        </div>
+                        {/* Info */}
+                        <div style={{ padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: 0, fontWeight: 800, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</p>
+                              {item.category && <p style={{ margin: '2px 0 0', fontSize: 11, color: C.muted, fontWeight: 600 }}>{item.category}</p>}
+                            </div>
+                            <span style={{ fontWeight: 900, fontSize: 16, color: C.red, flexShrink: 0 }}>{Number(item.price).toFixed(2)} MAD</span>
+                          </div>
+                          {item.description && <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 12, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.description}</p>}
                         </div>
                       </motion.div>
                     ))}
@@ -399,78 +531,96 @@ export default function RestaurantDashboard() {
               </motion.div>
             )}
 
-            {/* STATS TAB */}
-            {tab === 'stats' && stats && (
-              <motion.div key="stats" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <h2 style={{ margin: '0 0 24px', fontWeight: '900', fontSize: '22px', color: '#111' }}>Statistiques</h2>
+            {/* ══════════════ STATS ══════════════ */}
+            {tab === 'stats' && (
+              <motion.div key="stats" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <h2 style={{ margin: '0 0 20px', fontWeight: 900, fontSize: 22, color: C.text }}>Statistiques</h2>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-                  {[
-                    { label: 'Total commandes', value: stats.totalOrders, color: '#6366f1' },
-                    { label: 'En attente', value: stats.pendingOrders, color: '#f97316' },
-                    { label: 'Revenus (MAD)', value: stats.revenue, color: '#A51C1C' },
-                    { label: 'Note moyenne', value: `★ ${stats.avgRating}`, color: '#f59e0b' },
-                  ].map((s, i) => (
-                    <div key={i} style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                      <p style={{ margin: 0, color: '#888', fontSize: '12px', fontWeight: '600' }}>{s.label}</p>
-                      <p style={{ margin: '6px 0 0', fontSize: '24px', fontWeight: '900', color: s.color }}>{s.value}</p>
+                {!stats ? (
+                  <div style={{ textAlign: 'center', padding: 60, color: C.muted }}>Chargement...</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 20 }}>
+                      <StatCard label="Total commandes"  value={stats.totalOrders}                            color="#6366F1" icon={ShoppingBag} />
+                      <StatCard label="En attente"       value={stats.pendingOrders}                          color="#F97316" icon={Clock} />
+                      <StatCard label="Revenus (MAD)"    value={Number(stats.revenue).toFixed(0)}             color={C.red}  icon={DollarSign} sub="commandes livrées" />
+                      <StatCard label="Note moyenne"     value={<span style={{display:'flex',alignItems:'center',gap:4}}><Star size={16} fill="#F59E0B" color="#F59E0B"/>{stats.avgRating}</span>} color="#F59E0B" icon={Star} />
                     </div>
-                  ))}
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div style={{ background: '#fff', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                    <p style={{ margin: '0 0 16px', fontWeight: '800', color: '#111' }}>Revenus mensuels (MAD)</p>
-                    <Bar data={revenueByMonth} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }} />
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+                      {/* Revenue chart */}
+                      <div style={{ background: C.card, borderRadius: 18, padding: '22px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: '0 0 16px', fontWeight: 800, fontSize: 14, color: C.text }}>Revenus mensuels (MAD)</p>
+                        <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { family: 'Outfit', size: 10 } } }, y: { grid: { color: C.bg }, ticks: { font: { family: 'Outfit', size: 10 } }, beginAtZero: true } } }} />
+                      </div>
 
-                  {stats.topItems?.length > 0 && (
-                    <div style={{ background: '#fff', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                      <p style={{ margin: '0 0 16px', fontWeight: '800', color: '#111' }}>Top plats vendus</p>
-                      {stats.topItems.map((item, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < stats.topItems.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                          <span style={{ fontSize: '14px', color: '#333', fontWeight: '600' }}>{item.name}</span>
-                          <span style={{ fontSize: '14px', color: '#A51C1C', fontWeight: '800' }}>{item.total_sold} vendus</span>
-                        </div>
-                      ))}
+                      {/* Top items */}
+                      <div style={{ background: C.card, borderRadius: 18, padding: '22px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: '0 0 16px', fontWeight: 800, fontSize: 14, color: C.text }}>Top plats vendus</p>
+                        {stats.topItems?.length > 0
+                          ? stats.topItems.map((item, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: i < stats.topItems.length - 1 ? `1px solid ${C.border}` : 'none' }}>
+                                <span style={{ width: 22, height: 22, borderRadius: 6, background: C.red + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: C.red, flexShrink: 0 }}>#{i + 1}</span>
+                                <span style={{ flex: 1, fontSize: 13, color: C.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                                <span style={{ fontSize: 13, color: C.red, fontWeight: 800 }}>{item.total_sold} vendus</span>
+                              </div>
+                            ))
+                          : <p style={{ color: C.muted, fontSize: 13 }}>Aucune donnée encore</p>
+                        }
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </motion.div>
             )}
+
           </AnimatePresence>
         )}
       </div>
 
-      {/* ITEM FORM MODAL */}
+      {/* ══════════════ MODAL — PLAT ══════════════ */}
       <AnimatePresence>
-        {showItemForm && (
+        {itemModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setShowItemForm(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+            onClick={() => setItemModal(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92 }}
               onClick={e => e.stopPropagation()}
-              style={{ background: '#fff', borderRadius: '24px', padding: '36px', width: '100%', maxWidth: '500px' }}>
-              <h3 style={{ margin: '0 0 24px', fontWeight: '900', fontSize: '20px' }}>{editItem ? 'Modifier' : 'Ajouter'} un plat</h3>
-              <form onSubmit={handleSaveItem} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <input style={inputStyle} placeholder="Nom du plat *" value={itemForm.name} onChange={e => setItemForm({ ...itemForm, name: e.target.value })} required />
-                <input style={inputStyle} placeholder="Description" value={itemForm.description} onChange={e => setItemForm({ ...itemForm, description: e.target.value })} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <input style={inputStyle} placeholder="Prix (MAD) *" type="number" step="0.01" value={itemForm.price} onChange={e => setItemForm({ ...itemForm, price: e.target.value })} required />
-                  <input style={inputStyle} placeholder="Catégorie" value={itemForm.category} onChange={e => setItemForm({ ...itemForm, category: e.target.value })} />
+              style={{ background: '#fff', borderRadius: 22, padding: '32px 36px', width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: C.text }}>{editItem ? 'Modifier le plat' : 'Ajouter un plat'}</h3>
+                <button onClick={() => setItemModal(false)} style={{ background: C.bg, border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} color={C.muted}/></button>
+              </div>
+              <form onSubmit={handleSaveItem} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Image upload */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Photo du plat</label>
+                  <ImageUpload value={itemForm.image_url} onChange={v => setItemForm(f => ({ ...f, image_url: v }))} height={160} placeholder="Ajouter une photo du plat" />
                 </div>
-                <input style={inputStyle} placeholder="URL image" value={itemForm.image_url} onChange={e => setItemForm({ ...itemForm, image_url: e.target.value })} />
-                {editItem && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={itemForm.isAvailable} onChange={e => setItemForm({ ...itemForm, isAvailable: e.target.checked })} />
-                    Disponible
-                  </label>
-                )}
-                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                  <button type="submit" style={{ flex: 1, background: '#A51C1C', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
-                    {editItem ? 'Mettre à jour' : 'Ajouter'}
+                <input style={inputStyle} placeholder="Nom du plat *" value={itemForm.name} onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))} required
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }} placeholder="Description (optionnel)" value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <input style={inputStyle} placeholder="Prix (MAD) *" type="number" step="0.01" min="0" value={itemForm.price} onChange={e => setItemForm(f => ({ ...f, price: e.target.value }))} required
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                  <input style={inputStyle} placeholder="Catégorie" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${itemForm.isAvailable ? '#BBF7D0' : C.border}`, background: itemForm.isAvailable ? '#F0FDF4' : C.bg }}>
+                  <div onClick={() => setItemForm(f => ({ ...f, isAvailable: !f.isAvailable }))}
+                    style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${itemForm.isAvailable ? '#16A34A' : C.border}`, background: itemForm.isAvailable ? '#16A34A' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: '.15s' }}>
+                    {itemForm.isAvailable && <Check size={12} color="#fff" strokeWidth={3}/>}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: itemForm.isAvailable ? '#15803D' : C.muted }}>
+                    {itemForm.isAvailable ? 'Disponible à la commande' : 'Non disponible'}
+                  </span>
+                </label>
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button type="submit" disabled={savingItem} style={{ flex: 1, background: savingItem ? C.muted : C.red, color: '#fff', border: 'none', padding: 14, borderRadius: 12, fontWeight: 800, cursor: savingItem ? 'not-allowed' : 'pointer', fontSize: 15, fontFamily: 'Outfit,sans-serif', boxShadow: `0 6px 18px ${C.red}40`, transition: '.18s' }}>
+                    {savingItem ? 'Enregistrement...' : editItem ? 'Mettre à jour' : 'Ajouter le plat'}
                   </button>
-                  <button type="button" onClick={() => setShowItemForm(false)} style={{ padding: '14px 20px', borderRadius: '12px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: '700' }}>
+                  <button type="button" onClick={() => setItemModal(false)} style={{ padding: '14px 20px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontFamily: 'Outfit,sans-serif', color: C.sub }}>
                     Annuler
                   </button>
                 </div>
@@ -480,30 +630,42 @@ export default function RestaurantDashboard() {
         )}
       </AnimatePresence>
 
-      {/* RESTAURANT FORM MODAL */}
+      {/* ══════════════ MODAL — INFOS RESTAURANT ══════════════ */}
       <AnimatePresence>
-        {showRestaurantForm && (
+        {infoModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setShowRestaurantForm(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }}
+            onClick={() => setInfoModal(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92 }}
               onClick={e => e.stopPropagation()}
-              style={{ background: '#fff', borderRadius: '24px', padding: '36px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 style={{ margin: '0 0 24px', fontWeight: '900', fontSize: '20px' }}>{restaurant ? 'Modifier' : 'Créer'} le restaurant</h3>
-              <form onSubmit={restaurant ? handleSaveRestaurant : handleCreateRestaurant} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <input style={inputStyle} placeholder="Nom du restaurant *" value={restoForm.name || ''} onChange={e => setRestoForm({ ...restoForm, name: e.target.value })} required />
-                <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} placeholder="Description" value={restoForm.description || ''} onChange={e => setRestoForm({ ...restoForm, description: e.target.value })} />
-                <input style={inputStyle} placeholder="Adresse *" value={restoForm.address || ''} onChange={e => setRestoForm({ ...restoForm, address: e.target.value })} required />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <input style={inputStyle} placeholder="Ville" value={restoForm.city || ''} onChange={e => setRestoForm({ ...restoForm, city: e.target.value })} />
-                  <input style={inputStyle} placeholder="Cuisine (ex: Pizza)" value={restoForm.cuisine || ''} onChange={e => setRestoForm({ ...restoForm, cuisine: e.target.value })} />
+              style={{ background: '#fff', borderRadius: 22, padding: '32px 36px', width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: C.text }}>{restaurant ? 'Modifier le restaurant' : 'Créer mon restaurant'}</h3>
+                <button onClick={() => setInfoModal(false)} style={{ background: C.bg, border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} color={C.muted}/></button>
+              </div>
+              <form onSubmit={handleSaveResto} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Photo du restaurant */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: C.muted, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Photo du restaurant</label>
+                  <ImageUpload value={restoForm.image_url || ''} onChange={v => setRestoForm(f => ({ ...f, image_url: v }))} height={180} placeholder="Ajouter une photo de couverture" />
                 </div>
-                <input style={inputStyle} placeholder="URL image" value={restoForm.image_url || ''} onChange={e => setRestoForm({ ...restoForm, image_url: e.target.value })} />
-                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                  <button type="submit" style={{ flex: 1, background: '#A51C1C', color: '#fff', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
-                    {restaurant ? 'Mettre à jour' : 'Créer'}
+                <input style={inputStyle} placeholder="Nom du restaurant *" value={restoForm.name || ''} onChange={e => setRestoForm(f => ({ ...f, name: e.target.value }))} required
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} placeholder="Description" value={restoForm.description || ''} onChange={e => setRestoForm(f => ({ ...f, description: e.target.value }))}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <input style={inputStyle} placeholder="Adresse *" value={restoForm.address || ''} onChange={e => setRestoForm(f => ({ ...f, address: e.target.value }))} required
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <input style={inputStyle} placeholder="Ville" value={restoForm.city || ''} onChange={e => setRestoForm(f => ({ ...f, city: e.target.value }))}
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                  <input style={inputStyle} placeholder="Type de cuisine" value={restoForm.cuisine || ''} onChange={e => setRestoForm(f => ({ ...f, cuisine: e.target.value }))}
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button type="submit" disabled={savingResto} style={{ flex: 1, background: savingResto ? C.muted : C.red, color: '#fff', border: 'none', padding: 14, borderRadius: 12, fontWeight: 800, cursor: savingResto ? 'not-allowed' : 'pointer', fontSize: 15, fontFamily: 'Outfit,sans-serif', boxShadow: `0 6px 18px ${C.red}40` }}>
+                    {savingResto ? 'Enregistrement...' : restaurant ? 'Sauvegarder' : 'Créer le restaurant'}
                   </button>
-                  <button type="button" onClick={() => setShowRestaurantForm(false)} style={{ padding: '14px 20px', borderRadius: '12px', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: '700' }}>
+                  <button type="button" onClick={() => setInfoModal(false)} style={{ padding: '14px 20px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontFamily: 'Outfit,sans-serif', color: C.sub }}>
                     Annuler
                   </button>
                 </div>
@@ -512,6 +674,7 @@ export default function RestaurantDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

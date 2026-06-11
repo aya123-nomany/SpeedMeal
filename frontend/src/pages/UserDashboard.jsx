@@ -6,15 +6,15 @@ import {
   User, ShoppingBag, LogOut, MapPin, Phone,
   Mail, Clock, ChevronRight, Home, Settings,
   Package, Star, Edit3, Check, X, Heart, Bell,
-  Plus, Trash2, RefreshCw, Eye
+  Plus, Trash2, RefreshCw, Eye, Bike, Tag
 } from 'lucide-react';
 
 const STATUS = {
   pending:    { bg: '#fff7ed', color: '#c2410c', dot: '#f97316', label: 'En attente' },
-  preparing:  { bg: '#fefce8', color: '#a16207', dot: '#eab308', label: 'En prÃ©paration' },
+  preparing:  { bg: '#fefce8', color: '#a16207', dot: '#eab308', label: 'En préparation' },
   on_the_way: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'En route' },
-  delivered:  { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'LivrÃ©' },
-  cancelled:  { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'AnnulÃ©' },
+  delivered:  { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Livré' },
+  cancelled:  { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Annulé' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -217,9 +217,9 @@ export default function UserDashboard() {
             <p style={{ margin: '0 0 16px', fontSize: '13px', fontWeight: '800', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statistiques</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {[
-                { label: 'Commandes livrÃ©es', value: deliveredCount, color: '#22c55e' },
+                { label: 'Commandes livrées', value: deliveredCount, color: '#22c55e' },
                 { label: 'En cours',           value: pendingCount,   color: '#3b82f6' },
-                { label: 'Total dÃ©pensÃ©',      value: `${totalSpent.toFixed(2)} MAD`, color: '#A51C1C' },
+                { label: 'Total dépensé',      value: `${totalSpent.toFixed(2)} MAD`, color: '#A51C1C' },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', color: '#666', fontWeight: '600' }}>{s.label}</span>
@@ -254,7 +254,7 @@ export default function UserDashboard() {
                 <Home size={17} /> Accueil
               </Link>
               <button onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', borderRadius: '14px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '14px', background: 'transparent', color: '#ef4444', textAlign: 'left' }}>
-                <LogOut size={17} /> DÃ©connexion
+                <LogOut size={17} /> Déconnexion
               </button>
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function UserDashboard() {
                   <div style={{ background: '#fff', borderRadius: '24px', padding: '70px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                     <ShoppingBag size={40} color="#ddd" />
                     <h3 style={{ margin: '16px 0 8px', color: '#333' }}>Aucune commande</h3>
-                    <p style={{ color: '#aaa', marginBottom: '24px' }}>Vous n'avez pas encore passÃ© de commande.</p>
+                    <p style={{ color: '#aaa', marginBottom: '24px' }}>Vous n'avez pas encore passé de commande.</p>
                     <Link to="/menu" style={{ background: '#A51C1C', color: '#fff', padding: '14px 32px', borderRadius: '999px', textDecoration: 'none', fontWeight: '800', fontSize: '14px' }}>
                       Explorer le menu
                     </Link>
@@ -305,7 +305,7 @@ export default function UserDashboard() {
                               <p style={{ margin: '3px 0 0', color: '#888', fontSize: '13px', fontWeight: '600' }}>{order.restaurant_name}</p>
                               {order.items?.slice(0, 2).map(item => (
                                 <span key={item.id} style={{ display: 'inline-block', background: '#f9f9f9', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', margin: '3px 3px 0 0', color: '#666' }}>
-                                  {item.quantity}Ã— {item.item_name}
+                                  {item.quantity}× {item.item_name}
                                 </span>
                               ))}
                               {order.items?.length > 2 && <span style={{ fontSize: '11px', color: '#bbb' }}> +{order.items.length - 2} autres</span>}
@@ -408,11 +408,11 @@ export default function UserDashboard() {
                         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', padding: '13px 0' }}>
                             <input type="checkbox" checked={newAddress.is_default} onChange={e => setNewAddress({ ...newAddress, is_default: e.target.checked })} />
-                            Adresse par dÃ©faut
+                            Adresse par défaut
                           </label>
                         </div>
                       </div>
-                      <input style={inputStyle} placeholder="Adresse complÃ¨te *" required value={newAddress.address}
+                      <input style={inputStyle} placeholder="Adresse complète *" required value={newAddress.address}
                         onChange={e => setNewAddress({ ...newAddress, address: e.target.value })}
                         onFocus={e => e.target.style.borderColor = '#A51C1C'}
                         onBlur={e => e.target.style.borderColor = '#e5e7eb'} />
@@ -431,7 +431,7 @@ export default function UserDashboard() {
                 {addresses.length === 0 ? (
                   <div style={{ background: '#fff', borderRadius: '20px', padding: '60px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                     <MapPin size={40} color="#ddd" />
-                    <p style={{ color: '#aaa', marginTop: '12px' }}>Aucune adresse enregistrÃ©e</p>
+                    <p style={{ color: '#aaa', marginTop: '12px' }}>Aucune adresse enregistrée</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -444,7 +444,7 @@ export default function UserDashboard() {
                           <div>
                             <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {addr.label}
-                              {addr.is_default && <span style={{ background: '#A51C1C', color: '#fff', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: '700' }}>DÃ©faut</span>}
+                              {addr.is_default && <span style={{ background: '#A51C1C', color: '#fff', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: '700' }}>Défaut</span>}
                             </p>
                             <p style={{ margin: '3px 0 0', color: '#888', fontSize: '13px' }}>{addr.address}</p>
                           </div>
@@ -452,7 +452,7 @@ export default function UserDashboard() {
                         <div style={{ display: 'flex', gap: '8px' }}>
                           {!addr.is_default && (
                             <button onClick={() => handleSetDefaultAddress(addr.id)} style={{ background: '#f0fdf4', color: '#15803d', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
-                              DÃ©finir par dÃ©faut
+                              Définir par défaut
                             </button>
                           )}
                           <button onClick={() => handleDeleteAddress(addr.id)} style={{ background: '#fef2f2', color: '#b91c1c', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex' }}>
@@ -488,8 +488,8 @@ export default function UserDashboard() {
                     {notifications.map(n => (
                       <div key={n.id} onClick={() => !n.is_read && handleMarkRead(n.id)}
                         style={{ background: n.is_read ? '#fff' : '#fff7ed', borderRadius: '16px', padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: `1px solid ${n.is_read ? '#f5f5f5' : '#fed7aa'}`, cursor: n.is_read ? 'default' : 'pointer', display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: n.is_read ? '#f5f5f5' : '#fff0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '16px' }}>
-                          {n.type === 'order' ? 'ðŸ›µ' : n.type === 'promo' ? 'ðŸŽ' : 'ðŸ””'}
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: n.is_read ? '#f5f5f5' : '#fff0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {n.type === 'order' ? <Bike size={17} color={n.is_read ? '#aaa' : '#A51C1C'}/> : n.type === 'promo' ? <Tag size={17} color={n.is_read ? '#aaa' : '#f97316'}/> : <Bell size={17} color={n.is_read ? '#aaa' : '#A51C1C'}/>}
                         </div>
                         <div style={{ flex: 1 }}>
                           <p style={{ margin: 0, fontWeight: '800', fontSize: '14px', color: '#111' }}>{n.title}</p>
@@ -514,9 +514,9 @@ export default function UserDashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
                   {[
                     { icon: <Mail size={18} color="#A51C1C" />, label: 'Email', value: user.email },
-                    { icon: <Phone size={18} color="#A51C1C" />, label: 'TÃ©lÃ©phone', value: user.phone || 'â€”' },
+                    { icon: <Phone size={18} color="#A51C1C" />, label: 'Téléphone', value: user.phone || 'â€”' },
                     { icon: <MapPin size={18} color="#A51C1C" />, label: 'Adresse', value: user.address || 'â€”' },
-                    { icon: <User size={18} color="#A51C1C" />, label: 'RÃ´le', value: user.role },
+                    { icon: <User size={18} color="#A51C1C" />, label: 'Rôle', value: user.role },
                   ].map((item, i) => (
                     <div key={i} style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 4px 16px rgba(0,0,0,0.04)', display: 'flex', gap: '14px', alignItems: 'center' }}>
                       <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#fff0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{item.icon}</div>
@@ -542,7 +542,7 @@ export default function UserDashboard() {
                           onFocus={e => e.target.style.borderColor = '#A51C1C'} onBlur={e => e.target.style.borderColor = '#e5e7eb'} />
                       </div>
                       <div>
-                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '7px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TÃ©lÃ©phone</label>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '7px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Téléphone</label>
                         <input style={inputStyle} value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })}
                           onFocus={e => e.target.style.borderColor = '#A51C1C'} onBlur={e => e.target.style.borderColor = '#e5e7eb'} />
                       </div>
@@ -561,7 +561,7 @@ export default function UserDashboard() {
                     {saveMsg && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '12px', background: saveMsg === 'success' ? '#f0fdf4' : '#fef2f2', color: saveMsg === 'success' ? '#15803d' : '#b91c1c', fontWeight: '700', fontSize: '14px' }}>
                         {saveMsg === 'success' ? <Check size={16} /> : <X size={16} />}
-                        {saveMsg === 'success' ? 'Profil mis Ã  jour avec succÃ¨s !' : 'Erreur lors de la mise Ã  jour.'}
+                        {saveMsg === 'success' ? 'Profil mis à jour avec succès !' : 'Erreur lors de la mise à jour.'}
                       </div>
                     )}
 

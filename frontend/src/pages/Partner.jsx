@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, CheckCircle, Store, TrendingUp, Users,
   FileText, Smartphone, CreditCard, X, Star, ArrowRight,
-  Mail, Phone as PhoneIcon
+  Mail, Phone as PhoneIcon, Utensils, Coffee, Cake, Sandwich,
+  Camera, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import img1 from '../assets/smile.jpg';
 import img2 from '../assets/2.jpeg';
+import SectionTitle from '../components/SectionTitle';
 import img3 from '../assets/3.jpeg';
 import partnerHero from '../assets/télécharger.png';
 
@@ -34,81 +37,198 @@ const FAQItem = ({ question, answer }) => {
   );
 };
 
-/* ─── SIGNUP MODAL ─── */
-const SignupModal = ({ isOpen, onClose }) => {
-  const [form, setForm] = useState({ business: '', name: '', email: '', phone: '', city: '', type: '', accept: false });
-  const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
+/* ─── FORM COMPONENTS ─── */
+const inputBase = (hasErr) => ({
+  width: '100%', padding: '14px 16px', borderRadius: '10px',
+  border: `1.5px solid ${hasErr ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
+  background: 'rgba(255,255,255,0.06)', color: '#fff',
+  fontSize: '14px', fontWeight: '500', outline: 'none',
+  boxSizing: 'border-box', transition: 'border-color 0.2s',
+});
 
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: '' })); };
+const Field = React.memo(({ value, onChange, error, type = 'text', placeholder, optional = false }) => (
+  <div style={{ flex: 1 }}>
+    <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      {placeholder} {!optional && <span style={{ color: '#ef4444' }}>*</span>}
+    </label>
+    <input type={type} placeholder={placeholder} value={value} onChange={onChange}
+      style={inputBase(error)}
+      onFocus={e => { e.target.style.borderColor = '#A51C1C'; e.target.style.background = 'rgba(165,28,28,0.1)'; }}
+      onBlur={e => { e.target.style.borderColor = error ? '#ef4444' : 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
+    />
+    {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
+  </div>
+), (prevProps, nextProps) => {
+  return prevProps.error === nextProps.error && prevProps.placeholder === nextProps.placeholder && prevProps.value === nextProps.value;
+});
 
-  const validate = () => {
-    const e = {};
-    if (!form.business.trim()) e.business = 'Requis';
-    if (!form.name.trim())     e.name     = 'Requis';
-    if (!form.email.trim())    e.email    = 'Requis';
-    if (!form.phone.trim())    e.phone    = 'Requis';
-    if (!form.city)            e.city     = 'Requis';
-    if (!form.type)            e.type     = 'Requis';
-    if (!form.accept)          e.accept   = 'Veuillez accepter';
-    return e;
-  };
+const SelectField = React.memo(({ value, onChange, error, placeholder, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find(o => o.value === value);
+  const hasIcons = options[0]?.icon;
 
-  const handleSubmit = (ev) => {
-    ev.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitted(true);
-  };
-
-  const inputBase = (hasErr) => ({
-    width: '100%', padding: '14px 16px', borderRadius: '10px',
-    border: `1.5px solid ${hasErr ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
-    background: 'rgba(255,255,255,0.06)', color: '#fff',
-    fontSize: '14px', fontWeight: '500', outline: 'none',
-    boxSizing: 'border-box', transition: 'border-color 0.2s',
-  });
-
-  const Field = ({ fkey, type = 'text', placeholder }) => (
-    <div style={{ flex: 1 }}>
-      <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {placeholder} <span style={{ color: '#ef4444' }}>*</span>
-      </label>
-      <input type={type} placeholder={placeholder} value={form[fkey]}
-        onChange={e => set(fkey, e.target.value)}
-        style={inputBase(errors[fkey])}
-        onFocus={e => { e.target.style.borderColor = '#A51C1C'; e.target.style.background = 'rgba(165,28,28,0.1)'; }}
-        onBlur={e => { e.target.style.borderColor = errors[fkey] ? '#ef4444' : 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
-      />
-      {errors[fkey] && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{errors[fkey]}</p>}
-    </div>
-  );
-
-  const SelectField = ({ fkey, placeholder, options }) => (
+  return (
     <div style={{ flex: 1 }}>
       <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         {placeholder} <span style={{ color: '#ef4444' }}>*</span>
       </label>
       <div style={{ position: 'relative' }}>
-        <select value={form[fkey]} onChange={e => set(fkey, e.target.value)}
-          style={{ ...inputBase(errors[fkey]), appearance: 'none', cursor: 'pointer', paddingRight: '36px', color: form[fkey] ? '#fff' : 'rgba(255,255,255,0.35)' }}
-          onFocus={e => { e.target.style.borderColor = '#A51C1C'; }}
-          onBlur={e => { e.target.style.borderColor = errors[fkey] ? '#ef4444' : 'rgba(255,255,255,0.12)'; }}>
-          <option value="" style={{ background: '#1a1a1a' }}>Sélectionner</option>
-          {options.map(o => <option key={o.value} value={o.value} style={{ background: '#1a1a1a' }}>{o.label}</option>)}
-        </select>
-        <ChevronDown size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        <div onClick={() => setIsOpen(!isOpen)}
+          style={{ ...inputBase(error), cursor: 'pointer', paddingRight: '36px', display: 'flex', alignItems: 'center', gap: '10px', color: value ? '#fff' : 'rgba(255,255,255,0.35)' }}>
+          {hasIcons && selected ? <selected.icon size={18} color="#fff" /> : null}
+          {selected ? <span>{selected.label}</span> : <span style={{ color: 'rgba(255,255,255,0.35)' }}>Veuillez sélectionner</span>}
+          <ChevronDown size={16} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
+        </div>
+        {isOpen && (
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a1a', borderRadius: '10px', marginTop: '4px', border: '1px solid rgba(255,255,255,0.1)', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
+            {options.map(o => (
+              <div key={o.value} onClick={(e) => { e.stopPropagation(); onChange(o.value); setIsOpen(false); }}
+                style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#fff' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                {hasIcons && <o.icon size={18} color="#fff" />}
+                {o.label}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      {errors[fkey] && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{errors[fkey]}</p>}
+      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
     </div>
   );
+}, (prevProps, nextProps) => {
+  return prevProps.error === nextProps.error && prevProps.placeholder === nextProps.placeholder && prevProps.value === nextProps.value;
+});
+
+/* ─── IMAGE UPLOAD FIELD ─── */
+const ImageUploadField = React.memo(({ value, onChange, error }) => {
+  const inputRef = React.useRef();
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Image trop grande (max 5 Mo)'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div>
+      <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        Photo du restaurant <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400, textTransform: 'none' }}>(optionnelle)</span>
+      </label>
+      <div
+        onClick={() => inputRef.current.click()}
+        style={{
+          border: `2px dashed ${error ? '#ef4444' : value ? '#A51C1C' : 'rgba(255,255,255,0.15)'}`,
+          borderRadius: '12px', cursor: 'pointer', overflow: 'hidden',
+          transition: 'border-color 0.2s, background 0.2s',
+          background: value ? 'transparent' : 'rgba(255,255,255,0.03)',
+          minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseEnter={e => { if (!value) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+        onMouseLeave={e => { if (!value) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+      >
+        {value ? (
+          <div style={{ position: 'relative', width: '100%' }}>
+            <img src={value} alt="Preview" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', borderRadius: '10px' }} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(''); }}
+              style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+            >
+              <X size={14} color="#fff"/>
+            </button>
+            <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(165,28,28,0.85)', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Check size={11} color="#fff"/> Image sélectionnée
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+              <Camera size={32} color="rgba(255,255,255,0.4)"/>
+            </div>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Cliquez pour ajouter une photo</p>
+            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>JPG, PNG — max 5 Mo</p>
+          </div>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
+    </div>
+  );
+});
+
+/* ─── SIGNUP MODAL ─── */
+const SignupModal = ({ isOpen, onClose }) => {
+  const [formData, setFormData] = useState({
+    business: '', name: '', email: '', password: '', phone: '',
+    address: '', website: '', message: '', city: '', type: '', image_url: '', accept: false
+  });
+  const [errors, setErrors] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = useCallback((field) => (e) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  const handleSelectChange = useCallback((field) => (val) => {
+    setFormData(prev => ({ ...prev, [field]: val }));
+  }, []);
+
+  const validate = () => {
+    const e = {};
+    if (!formData.business.trim())  e.business  = 'Requis';
+    if (!formData.name.trim())      e.name      = 'Requis';
+    if (!formData.email.trim())     e.email     = 'Requis';
+    if (!formData.password.trim())  e.password  = 'Requis';
+    if (!formData.phone.trim())     e.phone     = 'Requis';
+    if (!formData.address.trim())   e.address   = 'Requis';
+    if (!formData.city)             e.city      = 'Requis';
+    if (!formData.type)             e.type      = 'Requis';
+    if (!formData.accept)           e.accept    = 'Veuillez accepter';
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost:5000/api/auth/register', {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: 'restaurant',
+        phone: formData.phone,
+        address: formData.address,
+        website: formData.website,
+        message: formData.message,
+        city: formData.city,
+        type: formData.type,
+        business: formData.business,
+        image_url: formData.image_url || null,
+      });
+      console.log('Registration successful:', response.data);
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Registration error:', err.response?.data);
+      setErrors({ submit: err.response?.data?.message || err.response?.data?.error || 'Erreur lors de l\'inscription' });
+    }
+    setLoading(false);
+  };
 
   const cities = ['Casablanca','Rabat','Marrakech','Fès','Tanger','Agadir','Meknès','Oujda','Kenitra','Tétouan'].map(c => ({ value: c, label: c }));
   const types  = [
-    { value: 'restaurant',  label: '🍽️ Restaurant' },
-    { value: 'cafe',        label: '☕ Café' },
-    { value: 'patisserie',  label: '🥐 Pâtisserie' },
-    { value: 'snack',       label: '🌮 Snack' },
+    { value: 'restaurant',  label: 'Restaurant',  icon: Utensils },
+    { value: 'cafe',        label: 'Café',        icon: Coffee },
+    { value: 'patisserie',  label: 'Pâtisserie',  icon: Cake },
+    { value: 'snack',       label: 'Snack',       icon: Sandwich },
   ];
 
   return (
@@ -116,11 +236,11 @@ const SignupModal = ({ isOpen, onClose }) => {
       {isOpen && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onClick={onClose}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}>
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <motion.div initial={{ scale: 0.92, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 30 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: '580px', background: '#1a1a1a', borderRadius: '24px', padding: '40px', position: 'relative', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            style={{ width: '100%', maxWidth: '600px', background: '#1a1a1a', borderRadius: '20px', padding: '40px', position: 'relative', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', maxHeight: '90vh', overflowY: 'auto' }}>
 
             <button onClick={onClose}
               style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -136,9 +256,9 @@ const SignupModal = ({ isOpen, onClose }) => {
                 </div>
                 <h3 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', marginBottom: '12px' }}>Demande envoyée !</h3>
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '15px', lineHeight: '1.7', marginBottom: '28px' }}>
-                  Merci <strong style={{ color: '#fff' }}>{form.name}</strong> ! Notre équipe vous contactera au <strong style={{ color: '#fff' }}>{form.phone}</strong> dans les 48h.
+                  Merci <strong style={{ color: '#fff' }}>{formData.name}</strong> ! Notre équipe vous contactera au <strong style={{ color: '#fff' }}>{formData.phone}</strong> dans les 48h.
                 </p>
-                <button onClick={() => { setSubmitted(false); setForm({ business: '', name: '', email: '', phone: '', city: '', type: '', accept: false }); setErrors({}); }}
+                <button onClick={() => { setSubmitted(false); setFormData({ business: '', name: '', email: '', password: '', phone: '', address: '', website: '', message: '', city: '', type: '', image_url: '', accept: false }); setErrors({}); }}
                   style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: '999px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
                   Nouvelle demande
                 </button>
@@ -150,31 +270,47 @@ const SignupModal = ({ isOpen, onClose }) => {
                   Rejoignez notre réseau et faites découvrir votre commerce à des milliers de clients.
                 </p>
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <Field fkey="business" placeholder="Nom du commerce" />
-                  <Field fkey="name"     placeholder="Nom du responsable" />
+                  <Field value={formData.business} onChange={handleChange('business')} error={errors.business} placeholder="Nom du commerce" />
+                  <Field value={formData.name} onChange={handleChange('name')} error={errors.name} placeholder="Nom du responsable" />
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <Field fkey="email" type="email" placeholder="Adresse e-mail" />
-                    <Field fkey="phone" type="tel"   placeholder="Téléphone" />
+                    <Field value={formData.email} onChange={handleChange('email')} error={errors.email} type="email" placeholder="Adresse e-mail" />
+                    <Field value={formData.password} onChange={handleChange('password')} error={errors.password} type="password" placeholder="Mot de passe" />
                   </div>
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <SelectField fkey="city" placeholder="Ville"              options={cities} />
-                    <SelectField fkey="type" placeholder="Type de commerce"   options={types} />
+                    <Field value={formData.phone} onChange={handleChange('phone')} error={errors.phone} type="tel" placeholder="Téléphone" />
+                  </div>
+                  <Field value={formData.address} onChange={handleChange('address')} error={errors.address} placeholder="Adresse" />
+                  <Field value={formData.website} onChange={handleChange('website')} error={errors.website} type="url" placeholder="Site web" optional={true} />
+                  <Field value={formData.message} onChange={handleChange('message')} error={errors.message} placeholder="Message" optional={true} />
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <SelectField value={formData.city} onChange={handleSelectChange('city')} error={errors.city} placeholder="Ville" options={cities} />
+                    <SelectField value={formData.type} onChange={handleSelectChange('type')} error={errors.type} placeholder="Type de commerce" options={types} />
                   </div>
 
+                  {/* Restaurant image upload */}
+                  <ImageUploadField
+                    value={formData.image_url}
+                    onChange={(val) => setFormData(prev => ({ ...prev, image_url: val }))}
+                    error={errors.image_url}
+                  />
+
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingTop: '4px' }}>
-                    <div onClick={() => set('accept', !form.accept)}
-                      style={{ width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0, marginTop: '1px', cursor: 'pointer', border: `2px solid ${errors.accept ? '#ef4444' : form.accept ? '#A51C1C' : 'rgba(255,255,255,0.25)'}`, background: form.accept ? '#A51C1C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
-                      {form.accept && <CheckCircle size={12} color="#fff" />}
-                    </div>
-                    <label onClick={() => set('accept', !form.accept)} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: '1.6' }}>
-                      J'accepte les <span style={{ color: '#A51C1C', fontWeight: '700' }}>conditions d'utilisation</span> et la <span style={{ color: '#A51C1C', fontWeight: '700' }}>politique de confidentialité</span>.
+                    <input
+                      type="checkbox"
+                      checked={formData.accept}
+                      onChange={(e) => setFormData(prev => ({...prev, accept: e.target.checked}))}
+                      style={{ width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0, marginTop: '1px', cursor: 'pointer', accentColor: '#A51C1C' }}
+                    />
+                    <label onClick={() => setFormData(prev => ({...prev, accept: !prev.accept}))} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: '1.5' }}>
+                      J'accepte les <span style={{ color: '#A51C1C', fontWeight: '700' }}>conditions</span> et <span style={{ color: '#A51C1C', fontWeight: '700' }}>politique</span>.
                     </label>
                   </div>
                   {errors.accept && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '-8px' }}>{errors.accept}</p>}
+                  {errors.submit && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '2px' }}>{errors.submit}</p>}
 
-                  <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} type="submit"
-                    style={{ width: '100%', background: '#A51C1C', color: '#fff', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '800', fontSize: '16px', cursor: 'pointer', marginTop: '4px', boxShadow: '0 8px 25px rgba(165,28,28,0.4)' }}>
-                    Envoyer la demande →
+                  <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} type="submit" disabled={loading}
+                    style={{ width: '100%', background: loading ? '#c97a7a' : '#A51C1C', color: '#fff', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '800', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px', boxShadow: '0 8px 25px rgba(165,28,28,0.4)' }}>
+                    {loading ? 'Envoi...' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>Envoyer <ArrowRight size={16}/></span>}
                   </motion.button>
                 </form>
               </>
@@ -246,9 +382,11 @@ const Partner = () => {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}
           style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px' }}>
-          <h1 style={{ fontSize: 'clamp(28px, 5vw, 52px)', fontWeight: '950', color: '#fff', lineHeight: 1.15, marginBottom: '28px', letterSpacing: '-1px' }}>
-            Passez votre commerce<br />en ligne avec <span style={{ color: '#FFC244' }}>SpeedMeal</span>
-          </h1>
+          <SectionTitle
+            title="Devenez Partenaire"
+            subtitle="Passez votre commerce en ligne avec SpeedMeal"
+            dark={true}
+          />
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} onClick={() => setModalOpen(true)}
             style={{ background: '#fff', color: '#A51C1C', padding: '16px 44px', borderRadius: '999px', border: 'none', fontWeight: '900', fontSize: '16px', cursor: 'pointer', boxShadow: '0 8px 30px rgba(0,0,0,0.25)' }}>
             Commencer maintenant

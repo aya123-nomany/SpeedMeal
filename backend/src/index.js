@@ -13,6 +13,8 @@ const ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:5175',
+    'http://localhost:5176',
+    'http://localhost:5177',
 ];
 
 const io = new Server(server, {
@@ -26,8 +28,9 @@ const io = new Server(server, {
 app.set('io', io);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-app.use(express.json());
-app.use(cors({ origin: ALLOWED_ORIGINS }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(helmet());
 app.use(morgan('dev'));
 
@@ -75,6 +78,13 @@ app.use('/api/favorites',           require('./routes/favoriteRoutes'));
 app.use('/api/notifications',       require('./routes/notificationRoutes'));
 app.use('/api/addresses',           require('./routes/addressRoutes'));
 app.use('/api/restaurant-dashboard',require('./routes/restaurantDashboardRoutes'));
+app.use('/api/openmenu',            require('./routes/openMenuProxy'));
+app.use('/api/ai',                  require('./routes/aiRoutes'));
+app.use('/api/financial',                require('./routes/financialRoutes'));
+app.use('/api/staff',                   require('./routes/staffRoutes'));
+app.use('/api/analytics',               require('./routes/analyticsRoutes'));
+app.use('/api/promotions',              require('./routes/promotionsRoutes'));
+app.use('/api/settings',                require('./routes/settingsRoutes'));
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));

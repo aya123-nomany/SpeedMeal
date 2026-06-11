@@ -226,8 +226,8 @@ export default function Checkout() {
               ))}
             </div>
             {paymentMethod === 'card' && (
-              <div style={{ marginTop: '12px', padding: '12px 16px', background: '#eff6ff', borderRadius: '12px', fontSize: '13px', color: '#1d4ed8' }}>
-                💳 Le paiement par carte sera traité via Stripe de manière sécurisée.
+              <div style={{ marginTop: '12px', padding: '12px 16px', background: '#eff6ff', borderRadius: '12px', fontSize: '13px', color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <CreditCard size={14} color="#1d4ed8"/> Le paiement par carte sera traité via Stripe de manière sécurisée.
               </div>
             )}
           </div>
@@ -261,7 +261,7 @@ export default function Checkout() {
               {coupon && (
                 <div style={{ marginTop: '8px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#15803d' }}>✅ {coupon.code}</p>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#15803d', display: 'flex', alignItems: 'center', gap: '5px' }}><Check size={13} color="#15803d"/> {coupon.code}</p>
                     <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#15803d' }}>−{coupon.discount_amount} MAD</p>
                   </div>
                   <button onClick={() => { setCoupon(null); setCouponCode(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>

@@ -60,11 +60,14 @@ exports.getRestaurantById = async (req, res) => {
             [req.params.id]
         );
 
-        // Get hours
-        const [hours] = await db.execute(
-            'SELECT * FROM restaurant_hours WHERE restaurant_id = ? ORDER BY day_of_week',
-            [req.params.id]
-        );
+        // Get hours (optional — table may not exist)
+        let hours = [];
+        try {
+            [hours] = await db.execute(
+                'SELECT * FROM restaurant_hours WHERE restaurant_id = ? ORDER BY day_of_week',
+                [req.params.id]
+            );
+        } catch (_) { /* table doesn't exist yet */ }
 
         // Group menu by category
         const menuByCategory = menuItems.reduce((acc, item) => {

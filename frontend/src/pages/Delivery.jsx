@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bike, DollarSign, Clock, Shield, ChevronDown,
   CheckCircle, Star, Zap, Wifi, Smartphone, X,
-  Mail, Phone as PhoneIcon, MapPin
+  Mail, Phone as PhoneIcon, MapPin, Car, Wrench
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import heroDelivery from '../assets/hero_delivery.png';
+import axios from 'axios';
+import heroDelivery from '../assets/food.jpg';
+import SectionTitle from '../components/SectionTitle';
 
 /* ─────────────── FAQ ─────────────── */
 const FAQItem = ({ question, answer }) => {
@@ -32,80 +34,94 @@ const FAQItem = ({ question, answer }) => {
 };
 
 /* ─────────────── MODAL FORM ─────────────── */
-const SignupModal = ({ isOpen, onClose }) => {
-  const [form, setForm] = useState({
-    name: '', email: '', phone: '', city: '', vehicle: '',
-    license: '', insurance: '', accept: false,
-  });
-  const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
+const inputBase = (hasErr) => ({
+  width: '100%', padding: '14px 16px', borderRadius: '10px',
+  border: `1.5px solid ${hasErr ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
+  background: 'rgba(255,255,255,0.06)', color: '#fff',
+  fontSize: '14px', fontWeight: '500', outline: 'none',
+  boxSizing: 'border-box', transition: 'border-color 0.2s',
+});
 
-  const set = (key, val) => { setForm(f => ({ ...f, [key]: val })); setErrors(e => ({ ...e, [key]: '' })); };
+const Field = React.memo(({ value, onChange, error, type = 'text', placeholder }) => (
+  <div style={{ flex: 1 }}>
+    <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      {placeholder} <span style={{ color: '#ef4444' }}>*</span>
+    </label>
+    <input type={type} placeholder={placeholder} value={value} onChange={onChange}
+      style={inputBase(error)}
+      onFocus={e => { e.target.style.borderColor = '#A51C1C'; e.target.style.background = 'rgba(165,28,28,0.1)'; }}
+      onBlur={e => { e.target.style.borderColor = error ? '#ef4444' : 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
+    />
+    {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
+  </div>
+), (prevProps, nextProps) => {
+  return prevProps.error === nextProps.error && prevProps.placeholder === nextProps.placeholder && prevProps.value === nextProps.value;
+});
 
-  const validate = () => {
-    const e = {};
-    if (!form.name.trim())   e.name      = 'Requis';
-    if (!form.email.trim())  e.email     = 'Requis';
-    if (!form.phone.trim())  e.phone     = 'Requis';
-    if (!form.city)          e.city      = 'Requis';
-    if (!form.vehicle)       e.vehicle   = 'Requis';
-    if (!form.license)       e.license   = 'Répondez';
-    if (!form.insurance)     e.insurance = 'Répondez';
-    if (!form.accept)        e.accept    = 'Veuillez accepter';
-    return e;
-  };
+const SelectField = React.memo(({ value, onChange, error, placeholder, options }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find(o => o.value === value);
+  const hasIcons = options[0]?.icon;
 
-  const handleSubmit = (ev) => {
-    ev.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitted(true);
-  };
+  if (hasIcons) {
+    return (
+      <div style={{ flex: 1 }}>
+        <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {placeholder} <span style={{ color: '#ef4444' }}>*</span>
+        </label>
+        <div style={{ position: 'relative' }}>
+          <div onClick={() => setIsOpen(!isOpen)}
+            style={{ ...inputBase(error), cursor: 'pointer', paddingRight: '36px', display: 'flex', alignItems: 'center', gap: '10px' }}
+          >
+            {hasIcons && selected ? <selected.icon size={18} color="#fff" /> : null}
+            {selected ? <span>{selected.label}</span> : <span style={{ color: 'rgba(255,255,255,0.35)' }}>Veuillez sélectionner</span>}
+            <ChevronDown size={16} color="rgba(255,255,255,0.4)" style={{ marginLeft: 'auto' }} />
+          </div>
+          {isOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1a1a', borderRadius: '10px', marginTop: '4px', border: '1px solid rgba(255,255,255,0.1)', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
+              {options.map(o => (
+                <div key={o.value} onClick={(e) => { e.stopPropagation(); onChange(o.value); setIsOpen(false); }}
+                  style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: '#fff', '&:hover': { background: 'rgba(255,255,255,0.05)' } }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <o.icon size={18} color="#fff" />
+                  {o.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
+      </div>
+    );
+  }
 
-  const inputBase = (hasErr) => ({
-    width: '100%', padding: '14px 16px', borderRadius: '10px',
-    border: `1.5px solid ${hasErr ? '#ef4444' : 'rgba(255,255,255,0.12)'}`,
-    background: 'rgba(255,255,255,0.06)', color: '#fff',
-    fontSize: '14px', fontWeight: '500', outline: 'none',
-    boxSizing: 'border-box', transition: 'border-color 0.2s',
-  });
-
-  const Field = ({ fkey, type = 'text', placeholder }) => (
-    <div style={{ flex: 1 }}>
-      <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {placeholder} <span style={{ color: '#ef4444' }}>*</span>
-      </label>
-      <input type={type} placeholder={placeholder} value={form[fkey]}
-        onChange={e => set(fkey, e.target.value)}
-        style={inputBase(errors[fkey])}
-        onFocus={e => { e.target.style.borderColor = '#A51C1C'; e.target.style.background = 'rgba(165,28,28,0.1)'; }}
-        onBlur={e => { e.target.style.borderColor = errors[fkey] ? '#ef4444' : 'rgba(255,255,255,0.12)'; e.target.style.background = 'rgba(255,255,255,0.06)'; }}
-      />
-      {errors[fkey] && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{errors[fkey]}</p>}
-    </div>
-  );
-
-  const SelectField = ({ fkey, placeholder, options }) => (
+  return (
     <div style={{ flex: 1 }}>
       <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         {placeholder} <span style={{ color: '#ef4444' }}>*</span>
       </label>
       <div style={{ position: 'relative' }}>
-        <select value={form[fkey]} onChange={e => set(fkey, e.target.value)}
-          style={{ ...inputBase(errors[fkey]), appearance: 'none', cursor: 'pointer', paddingRight: '36px', color: form[fkey] ? '#fff' : 'rgba(255,255,255,0.35)' }}
+        <select value={value} onChange={(e) => onChange(e.target.value)}
+          style={{ ...inputBase(error), appearance: 'none', cursor: 'pointer', paddingRight: '36px', color: value ? '#fff' : 'rgba(255,255,255,0.35)' }}
           onFocus={e => { e.target.style.borderColor = '#A51C1C'; }}
-          onBlur={e => { e.target.style.borderColor = errors[fkey] ? '#ef4444' : 'rgba(255,255,255,0.12)'; }}
+          onBlur={e => { e.target.style.borderColor = error ? '#ef4444' : 'rgba(255,255,255,0.12)'; }}
         >
           <option value="" style={{ background: '#1a1a1a' }}>Veuillez sélectionner</option>
           {options.map(o => <option key={o.value} value={o.value} style={{ background: '#1a1a1a' }}>{o.label}</option>)}
         </select>
         <ChevronDown size={16} color="rgba(255,255,255,0.4)" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
       </div>
-      {errors[fkey] && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{errors[fkey]}</p>}
+      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
     </div>
   );
+}, (prevProps, nextProps) => {
+  return prevProps.error === nextProps.error && prevProps.placeholder === nextProps.placeholder && prevProps.value === nextProps.value;
+});
 
-  const RadioField = ({ fkey, label }) => (
+const RadioField = React.memo(({ value, onChange, error, label }) => {
+  return (
     <div>
       <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         {label} <span style={{ color: '#ef4444' }}>*</span>
@@ -114,34 +130,87 @@ const SignupModal = ({ isOpen, onClose }) => {
         {['Oui', 'Non'].map(val => (
           <label key={val} style={{
             flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '12px 16px', borderRadius: '10px', cursor: 'pointer',
-            border: `1.5px solid ${form[fkey] === val ? '#A51C1C' : 'rgba(255,255,255,0.12)'}`,
-            background: form[fkey] === val ? 'rgba(165,28,28,0.15)' : 'rgba(255,255,255,0.04)',
-            transition: 'all 0.2s', fontSize: '14px', fontWeight: '600', color: form[fkey] === val ? '#fff' : 'rgba(255,255,255,0.5)',
-          }}>
-            <div style={{
-              width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-              border: `2px solid ${form[fkey] === val ? '#A51C1C' : 'rgba(255,255,255,0.3)'}`,
-              background: form[fkey] === val ? '#A51C1C' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {form[fkey] === val && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />}
+            padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
+            border: `1.5px solid ${value === val ? '#A51C1C' : 'rgba(255,255,255,0.12)'}`,
+            background: value === val ? 'rgba(165,28,28,0.15)' : 'rgba(255,255,255,0.06)',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = value === val ? 'rgba(165,28,28,0.2)' : 'rgba(255,255,255,0.1)'}
+          onMouseLeave={e => e.currentTarget.style.background = value === val ? 'rgba(165,28,28,0.15)' : 'rgba(255,255,255,0.06)'}
+          >
+            <input type="radio" name={label} value={val} checked={value === val} onChange={() => onChange(val)} style={{ display: 'none' }} />
+            <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: `2px solid ${value === val ? '#A51C1C' : 'rgba(255,255,255,0.25)'}`, background: value === val ? '#A51C1C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {value === val && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff' }} />}
             </div>
-            <input type="radio" name={fkey} value={val} checked={form[fkey] === val}
-              onChange={() => set(fkey, val)} style={{ display: 'none' }} />
             {val}
           </label>
         ))}
       </div>
-      {errors[fkey] && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{errors[fkey]}</p>}
+      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
     </div>
   );
+}, (prevProps, nextProps) => {
+  return prevProps.error === nextProps.error && prevProps.label === nextProps.label && prevProps.value === nextProps.value;
+});
+
+const SignupModal = ({ isOpen, onClose }) => {
+  const [form, setForm] = useState({
+    name: '', email: '', password: '', phone: '', city: '', vehicle: '',
+    license: '', insurance: '', accept: false,
+  });
+  const [errors, setErrors] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const set = useCallback((key, val) => {
+    setForm(f => ({ ...f, [key]: val }));
+    setErrors(e => ({ ...e, [key]: '' }));
+  }, []);
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())      e.name      = 'Requis';
+    if (!form.email.trim())     e.email     = 'Requis';
+    if (!form.password.trim())  e.password  = 'Requis';
+    if (!form.phone.trim())     e.phone     = 'Requis';
+    if (!form.city)             e.city      = 'Requis';
+    if (!form.vehicle)          e.vehicle   = 'Requis';
+    if (!form.license)          e.license   = 'Répondez';
+    if (!form.insurance)        e.insurance = 'Répondez';
+    if (!form.accept)           e.accept    = 'Veuillez accepter';
+    return e;
+  };
+
+  const handleSubmit = async (ev) => {
+    ev.preventDefault();
+    
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setLoading(true);
+    try {
+      await axios.post('http://localhost:5000/api/auth/register', {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: 'delivery',
+        phone: form.phone,
+        address: form.city,
+        vehicle: form.vehicle,
+        license: form.license,
+        insurance: form.insurance
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setErrors({ submit: err.response?.data?.message || 'Erreur lors de l\'inscription' });
+    }
+    setLoading(false);
+  };
 
   const cities = ['Casablanca','Rabat','Marrakech','Fès','Tanger','Agadir','Meknès','Oujda','Kenitra','Tétouan'].map(c => ({ value: c, label: c }));
   const vehicles = [
-    { value: 'velo', label: '🚲 Vélo' },
-    { value: 'scooter', label: '🛵 Scooter / Moto' },
-    { value: 'voiture', label: '🚗 Voiture' },
+    { value: 'velo', label: 'Vélo', icon: Bike },
+    { value: 'scooter', label: 'Scooter / Moto', icon: Wrench },
+    { value: 'voiture', label: 'Voiture', icon: Car },
   ];
 
   return (
@@ -150,13 +219,13 @@ const SignupModal = ({ isOpen, onClose }) => {
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onClick={onClose}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
         >
           <motion.div
             initial={{ scale: 0.92, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 30 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: '560px', background: '#1a1a1a', borderRadius: '24px', padding: '40px', position: 'relative', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)' }}
+            style={{ width: '100%', maxWidth: '600px', background: '#1a1a1a', borderRadius: '20px', padding: '40px', position: 'relative', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.06)', maxHeight: '90vh', overflowY: 'auto' }}
           >
             {/* Close */}
             <button onClick={onClose} style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s' }}
@@ -174,7 +243,7 @@ const SignupModal = ({ isOpen, onClose }) => {
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '15px', lineHeight: '1.7', marginBottom: '28px' }}>
                   Merci <strong style={{ color: '#fff' }}>{form.name}</strong> ! Notre équipe vous contactera au <strong style={{ color: '#fff' }}>{form.phone}</strong> dans les 48h.
                 </p>
-                <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', phone: '', city: '', vehicle: '', license: '', insurance: '', accept: false }); setErrors({}); }}
+                <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', password: '', phone: '', city: '', vehicle: '', license: '', insurance: '', accept: false }); setErrors({}); }}
                   style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: '999px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
                   Nouvelle inscription
                 </button>
@@ -186,33 +255,35 @@ const SignupModal = ({ isOpen, onClose }) => {
                   Souhaitez-vous rejoindre SpeedMeal en tant que livreur ? Remplissez le formulaire ci-dessous et notre équipe vous contactera dans les plus brefs délais.
                 </p>
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <Field fkey="name"  placeholder="Nom complet" />
-                  <Field fkey="email" type="email" placeholder="Adresse e-mail" />
-                  <Field fkey="phone" type="tel" placeholder="Numéro de téléphone" />
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <Field value={form.name} onChange={(e) => set('name', e.target.value)} error={errors.name} placeholder="Nom complet" />
+                  <Field value={form.email} onChange={(e) => set('email', e.target.value)} error={errors.email} type="email" placeholder="Adresse e-mail" />
+                  <Field value={form.password} onChange={(e) => set('password', e.target.value)} error={errors.password} type="password" placeholder="Mot de passe" />
+                  <Field value={form.phone} onChange={(e) => set('phone', e.target.value)} error={errors.phone} type="tel" placeholder="Numéro de téléphone" />
 
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <SelectField fkey="city"    placeholder="Ville"             options={cities} />
-                    <SelectField fkey="vehicle" placeholder="Type de véhicule"  options={vehicles} />
+                    <SelectField value={form.city} onChange={(val) => set('city', val)} error={errors.city} placeholder="Ville" options={cities} />
+                    <SelectField value={form.vehicle} onChange={(val) => set('vehicle', val)} error={errors.vehicle} placeholder="Type de véhicule" options={vehicles} />
                   </div>
 
-                  <RadioField fkey="license"   label="Avez-vous un permis de conduire ?" />
-                  <RadioField fkey="insurance" label="Avez-vous une assurance pour le véhicule ?" />
+                  <RadioField value={form.license} onChange={(val) => set('license', val)} error={errors.license} label="Avez-vous un permis de conduire ?" />
+                  <RadioField value={form.insurance} onChange={(val) => set('insurance', val)} error={errors.insurance} label="Avez-vous une assurance pour le véhicule ?" />
 
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingTop: '4px' }}>
                     <div onClick={() => set('accept', !form.accept)}
                       style={{ width: '18px', height: '18px', borderRadius: '5px', flexShrink: 0, marginTop: '1px', cursor: 'pointer', border: `2px solid ${errors.accept ? '#ef4444' : form.accept ? '#A51C1C' : 'rgba(255,255,255,0.25)'}`, background: form.accept ? '#A51C1C' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}>
                       {form.accept && <CheckCircle size={12} color="#fff" />}
                     </div>
-                    <label onClick={() => set('accept', !form.accept)} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: '1.6' }}>
-                      J'accepte les <span style={{ color: '#A51C1C', fontWeight: '700' }}>conditions d'utilisation</span> et la <span style={{ color: '#A51C1C', fontWeight: '700' }}>politique de confidentialité</span> de SpeedMeal.
+                    <label onClick={() => set('accept', !form.accept)} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: '1.5' }}>
+                      J'accepte les <span style={{ color: '#A51C1C', fontWeight: '700' }}>conditions</span> et <span style={{ color: '#A51C1C', fontWeight: '700' }}>politique</span>
                     </label>
                   </div>
-                  {errors.accept && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '-10px' }}>{errors.accept}</p>}
+                  {errors.accept && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '-8px' }}>{errors.accept}</p>}
+                  {errors.submit && <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '2px' }}>{errors.submit}</p>}
 
-                  <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} type="submit"
-                    style={{ width: '100%', background: '#A51C1C', color: '#fff', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '800', fontSize: '16px', cursor: 'pointer', marginTop: '4px', boxShadow: '0 8px 25px rgba(165,28,28,0.4)' }}>
-                    Envoyer le formulaire
+                  <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} type="submit" disabled={loading}
+                    style={{ width: '100%', background: loading ? '#c97a7a' : '#A51C1C', color: '#fff', padding: '16px', borderRadius: '12px', border: 'none', fontWeight: '800', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', marginTop: '4px', boxShadow: '0 8px 25px rgba(165,28,28,0.4)' }}>
+                    {loading ? 'Envoi...' : 'Envoyer'}
                   </motion.button>
                 </form>
               </>
@@ -280,9 +351,11 @@ const Delivery = () => {
           transition={{ duration: 0.7 }}
           style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px' }}
         >
-          <h1 style={{ fontSize: 'clamp(28px, 5vw, 52px)', fontWeight: '950', color: '#fff', lineHeight: 1.15, marginBottom: '28px', letterSpacing: '-1px' }}>
-            Rejoignez SpeedMeal<br />en tant que <span style={{ color: '#FFC244' }}>livreur</span>
-          </h1>
+          <SectionTitle
+            title="Rejoignez SpeedMeal"
+            subtitle="Devenez livreur et gagnez votre indépendance"
+            dark={true}
+          />
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}

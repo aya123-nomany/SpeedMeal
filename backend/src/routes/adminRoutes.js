@@ -250,4 +250,105 @@ router.get('/commissions', isAdmin, async (req, res) => {
     }
 });
 
+// ── APPROVED DRIVERS list ─────────────────────────────────────────────────
+router.get('/drivers', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.execute(
+            `SELECT u.id, u.name, u.email, u.phone, u.address, u.isActive, u.created_at,
+                    u.vehicle_type, u.has_license, u.has_insurance,
+                    COUNT(o.id)                                    AS total_deliveries,
+                    COALESCE(SUM(o.total_price), 0)                AS total_revenue,
+                    SUM(o.status = 'delivered')                    AS delivered_count,
+                    MAX(o.created_at)                              AS last_delivery
+             FROM users u
+             LEFT JOIN orders o ON o.delivery_id = u.id
+             WHERE u.role = 'delivery' AND u.isVerified = TRUE
+             GROUP BY u.id
+             ORDER BY delivered_count DESC, u.created_at DESC`
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── PENDING APPROVALS ─────────────────────────────────────────────────────────
+
+router.get('/pending/restaurants', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.execute(
+            `SELECT u.id AS user_id, u.name, u.email, u.phone, u.created_at,
+                    r.id AS restaurant_id, r.name AS restaurant_name, r.address,
+                    r.city, r.cuisine, r.description, r.image_url
+             FROM users u
+             LEFT JOIN restaurants r ON r.owner_id = u.id
+             WHERE u.role = 'restaurant' AND u.isVerified = FALSE AND u.isActive = TRUE
+             ORDER BY u.created_at DESC`
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/pending/delivery', isAdmin, async (req, res) => {
+    try {
+        const [rows] = await db.execute(
+            `SELECT id AS user_id, name, email, phone, address, created_at, isActive,
+                    vehicle_type, has_license, has_insurance
+             FROM users
+             WHERE role = 'delivery' AND isVerified = FALSE AND isActive = TRUE
+             ORDER BY created_at DESC`
+        );
+        res.json(rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/pending/restaurants/:userId/approve', isAdmin, async (req, res) => {
+    try {
+        await db.execute('UPDATE users SET isVerified = TRUE, isActive = TRUE WHERE id = ?', [req.params.userId]);
+        await db.execute('UPDATE restaurants SET isVerified = TRUE, isOpen = TRUE WHERE owner_id = ?', [req.params.userId]);
+        await db.execute(
+            'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+            [req.params.userId, '🎉 Compte approuvé !', "Votre restaurant a été approuvé par l'administration. Vous pouvez maintenant recevoir des commandes.", 'system']
+        );
+        const io = req.app.get('io');
+        if (io) io.to(`user_${req.params.userId}`).emit('notification', { title: '🎉 Compte approuvé !', message: 'Votre restaurant a été approuvé.' });
+        res.json({ message: 'Restaurant approved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/pending/restaurants/:userId/reject', isAdmin, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        await db.execute('UPDATE users SET isActive = FALSE WHERE id = ?', [req.params.userId]);
+        await db.execute(
+            'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+            [req.params.userId, '❌ Demande refusée', reason || "Votre demande d'inscription en tant que restaurant a été refusée.", 'system']
+        );
+        res.json({ message: 'Restaurant rejected' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/pending/delivery/:userId/approve', isAdmin, async (req, res) => {
+    try {
+        await db.execute('UPDATE users SET isVerified = TRUE, isActive = TRUE WHERE id = ?', [req.params.userId]);
+        await db.execute(
+            'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+            [req.params.userId, '🚀 Compte livreur approuvé !', 'Votre compte livreur a été approuvé. Vous pouvez maintenant accepter des livraisons.', 'system']
+        );
+        const io = req.app.get('io');
+        if (io) io.to(`user_${req.params.userId}`).emit('notification', { title: '🚀 Compte livreur approuvé !', message: 'Votre compte a été approuvé.' });
+        res.json({ message: 'Driver approved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/pending/delivery/:userId/reject', isAdmin, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        await db.execute('UPDATE users SET isActive = FALSE WHERE id = ?', [req.params.userId]);
+        await db.execute(
+            'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
+            [req.params.userId, '❌ Demande refusée', reason || "Votre demande d'inscription en tant que livreur a été refusée.", 'system']
+        );
+        res.json({ message: 'Driver rejected' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

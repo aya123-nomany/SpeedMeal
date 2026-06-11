@@ -7,7 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   Bike, Package, CheckCircle, MapPin, Clock, LogOut,
-  Home, TrendingUp, Phone, Navigation, RefreshCw
+  Home, TrendingUp, Phone, Navigation, RefreshCw, Store
 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 
@@ -213,8 +213,8 @@ export default function DeliveryDashboard() {
                           <p style={{ margin: 0, fontWeight: '800', fontSize: '16px', color: '#111' }}>
                             Commande #{order.id} — <span style={{ color: '#A51C1C' }}>{Number(order.total_price).toFixed(2)} MAD</span>
                           </p>
-                          <p style={{ margin: '6px 0 3px', color: '#555', fontSize: '14px', fontWeight: '600' }}>
-                            🍔 {order.restaurant_name}
+                          <p style={{ margin: '6px 0 3px', color: '#555', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Store size={14} color="#555"/> {order.restaurant_name}
                           </p>
                           <p style={{ margin: '3px 0', color: '#888', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                             <MapPin size={13} /> {order.restaurant_address}
@@ -268,8 +268,8 @@ export default function DeliveryDashboard() {
                         const order = myDeliveries.find(o => o.id === activeOrderId);
                         if (order) handleComplete(activeOrderId);
                       }}
-                      style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}>
-                      ✅ Marquer comme livré
+                      style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle size={14}/> Marquer comme livré
                     </button>
                   </div>
                   <MapContainer
@@ -308,8 +308,8 @@ export default function DeliveryDashboard() {
                           </span>
                           {order.status === 'on_the_way' && (
                             <button onClick={() => handleComplete(order.id)}
-                              style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>
-                              ✅ Livré
+                              style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <CheckCircle size={13}/> Livré
                             </button>
                           )}
                         </div>

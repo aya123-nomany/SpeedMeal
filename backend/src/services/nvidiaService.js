@@ -1,0 +1,119 @@
+const OpenAI = require('openai');
+
+const client = new OpenAI({
+    baseURL: 'https://integrate.api.nvidia.com/v1',
+    apiKey: process.env.NVIDIA_API_KEY,
+});
+
+/**
+ * Send a message to NVIDIA Llama and get a response.
+ * @param {string} message  - User or system prompt
+ * @param {Array}  history  - Optional prior messages [{role, content}]
+ * @returns {string} AI response text
+ */
+async function askAI(message, history = [], siteContext = null) {
+    // Build a rich system prompt that includes real site data when available
+    let systemContent =
+        'You are SpeedMeal AI Assistant — an intelligent assistant embedded in the SpeedMeal ' +
+        'food delivery admin dashboard. You have full access to the platform\'s live data. ' +
+        'Always respond concisely and in the SAME LANGUAGE the user writes in (Darija/Arabic/French/English). ' +
+        'Use the site data provided to give accurate, data-driven answers. ' +
+        'When asked about restaurants, orders, revenue, or trends — use the exact numbers from the context below.';
+
+    if (siteContext) {
+        const {
+            stats = {},
+            restaurants = [],
+            orders = [],
+            topRestaurants = [],
+            recentOrders = [],
+        } = siteContext;
+
+        // Compute derived metrics
+        const deliveredOrders  = orders.filter(o => o.status === 'delivered').length;
+        const cancelledOrders  = orders.filter(o => o.status === 'cancelled').length;
+        const pendingOrders    = orders.filter(o => o.status === 'pending').length;
+        const avgOrderValue    = orders.length
+            ? (orders.reduce((s, o) => s + Number(o.total_price || 0), 0) / orders.length).toFixed(2)
+            : 0;
+
+        const topRest = [...restaurants]
+            .sort((a, b) => Number(b.rating) - Number(a.rating))
+            .slice(0, 5)
+            .map((r, i) => `  ${i + 1}. ${r.name} (${r.city}, ${r.cuisine}) — Note: ${Number(r.rating || 0).toFixed(1)}/5`);
+
+        const topByOrders = [...restaurants]
+            .sort((a, b) => (b._orderCount || 0) - (a._orderCount || 0))
+            .slice(0, 3)
+            .map(r => `  - ${r.name}: ${r._orderCount || 0} commandes`);
+
+        systemContent +=
+            '\n\n━━━━━━━━━━ DONNÉES RÉELLES SPEEDMEAL ━━━━━━━━━━\n' +
+            `📊 VUE D'ENSEMBLE:\n` +
+            `  • Total utilisateurs: ${stats.totalUsers || 0}\n` +
+            `  • Total commandes: ${stats.totalOrders || 0}\n` +
+            `  • Commandes aujourd'hui: ${stats.todayOrders || 0}\n` +
+            `  • Restaurants actifs: ${stats.totalRestaurants || 0}\n` +
+            `  • Livreurs: ${stats.totalDeliveries || 0}\n` +
+            `  • Revenus totaux: ${Number(stats.revenue || 0).toFixed(2)} MAD\n` +
+            `  • Revenus aujourd'hui: ${Number(stats.todayRevenue || 0).toFixed(2)} MAD\n` +
+            `  • Commandes en attente: ${stats.pendingOrders || pendingOrders}\n` +
+            `  • Commandes livrées: ${deliveredOrders}\n` +
+            `  • Commandes annulées: ${cancelledOrders}\n` +
+            `  • Valeur moyenne par commande: ${avgOrderValue} MAD\n\n` +
+            (topRest.length
+                ? `⭐ TOP RESTAURANTS PAR NOTE:\n${topRest.join('\n')}\n\n`
+                : '') +
+            (restaurants.length
+                ? `🏪 TOUS LES RESTAURANTS (${restaurants.length} total):\n` +
+                  restaurants.map(r => `  - ${r.name} | ${r.city} | ${r.cuisine || 'N/A'} | ★${Number(r.rating||0).toFixed(1)} | ${r.isOpen ? 'Ouvert' : 'Fermé'}`).join('\n') + '\n\n'
+                : '') +
+            (recentOrders.length
+                ? `📦 COMMANDES RÉCENTES (${recentOrders.length}):\n` +
+                  recentOrders.slice(0, 5).map(o =>
+                      `  - #${o.id} | ${o.user_name} → ${o.restaurant_name} | ${Number(o.total_price||0).toFixed(2)} MAD | ${o.status}`
+                  ).join('\n') + '\n\n'
+                : '') +
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+    }
+
+    const messages = [
+        { role: 'system', content: systemContent },
+        ...history,
+        { role: 'user', content: message },
+    ];
+
+    const response = await client.chat.completions.create({
+        model: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
+        messages,
+        temperature: 0.6,
+        max_tokens: 1024,
+    });
+
+    return response.choices[0].message.content;
+}
+
+/**
+ * Ask Llama to interpret forecast data and return business recommendations.
+ * @param {Object} forecastData - { predicted_orders, trend, peak_day, weekly_forecast }
+ * @returns {string} Recommendations text
+ */
+async function interpretForecast(forecastData) {
+    const prompt =
+        `Analyse les données de prévision SpeedMeal suivantes et donne des recommandations business:\n\n` +
+        `📊 Données:\n` +
+        `- Commandes prévues (prochains 7 jours): ${forecastData.predicted_orders}\n` +
+        `- Tendance: ${forecastData.trend}\n` +
+        `- Jour de pointe prévu: ${forecastData.peak_day || 'N/A'}\n` +
+        `- Prévision journalière: ${JSON.stringify(forecastData.weekly_forecast || [])}\n\n` +
+        `Recommande:\n` +
+        `1. Gestion des stocks (quoi commander, combien)\n` +
+        `2. Staffing (livreurs, cuisine)\n` +
+        `3. Promotions suggérées pour les jours creux\n` +
+        `4. Alertes gaspillage alimentaire\n` +
+        `Sois concis et pratique.`;
+
+    return await askAI(prompt);
+}
+
+module.exports = { askAI, interpretForecast };

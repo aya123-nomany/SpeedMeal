@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, User, Search, Menu as MenuIcon, X, MapPin, Phone, Mail, Bike, Store, LogOut, LayoutDashboard } from 'lucide-react';
@@ -19,7 +19,9 @@ import RestaurantDashboard from "./pages/RestaurantDashboard";
 import DeliveryDashboard from "./pages/DeliveryDashboard";
 import Checkout from "./pages/Checkout";
 import OrderTracking from "./pages/OrderTracking";
+import MealDB from "./pages/MealDB";
 import { CartProvider } from "./context/CartContext";
+import AIChatWidget from "./components/AIChatWidget";
 
 import logoUrl from "./assets/logo.png";
 
@@ -257,10 +259,11 @@ const Navbar = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
-                  { name: 'Home', path: '/' },
-                  { name: 'Menu', path: '/menu' },
-                  { name: 'About us', path: '/about' },
-                  { name: 'Blog', path: '/blog' },
+                  { name: 'Home',       path: '/' },
+                  { name: 'Menu',       path: '/menu' },
+                  { name: 'Recettes',   path: '/recipes' },
+                  { name: 'About us',   path: '/about' },
+                  { name: 'Blog',       path: '/blog' },
                   { name: 'Contact us', path: '/contact' }
                 ].map((item, index) => (
                   <Link
@@ -364,9 +367,11 @@ const AppContent = () => {
           <Route path="/delivery-dashboard" element={<DeliveryDashboard />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order/:id" element={<OrderTracking />} />
+          <Route path="/recipes" element={<MealDB />} />
         </Routes>
       </AnimatePresence>
       {!shouldHide && <Footer />}
+      {!shouldHide && <AIChatWidget />}
     </>
   );
 };

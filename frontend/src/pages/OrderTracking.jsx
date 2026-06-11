@@ -6,7 +6,7 @@ import { io } from 'socket.io-client';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { CheckCircle, Clock, Package, Bike, Home, Star, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Clock, Package, Bike, Home, Star, ArrowLeft, XCircle, MapPin, CreditCard } from 'lucide-react';
 
 // Fix leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -18,7 +18,7 @@ L.Icon.Default.mergeOptions({
 
 const bikeIcon = L.divIcon({
   className: '',
-  html: `<div style="background:#A51C1C;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(165,28,28,0.4);font-size:18px;border:3px solid #fff">🛵</div>`,
+  html: `<div style="background:#A51C1C;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(165,28,28,0.4);border:3px solid #fff"><svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='18.5' cy='17.5' r='3.5'/><circle cx='5.5' cy='17.5' r='3.5'/><circle cx='15' cy='5' r='1'/><path d='M12 17.5V14l-3-3 4-3 2 3h2'/></svg></div>`,
   iconSize: [36, 36],
   iconAnchor: [18, 18],
 });
@@ -176,19 +176,20 @@ export default function OrderTracking() {
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
-              <p style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#111' }}>
-                {order.status === 'pending'    && '⏳ Votre commande attend la confirmation du restaurant'}
-                {order.status === 'preparing'  && '🍳 Le restaurant prépare votre commande...'}
-                {order.status === 'on_the_way' && '🛵 Le livreur est en route vers vous!'}
-                {order.status === 'delivered'  && '🎉 Commande livrée! Bon appétit!'}
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {order.status === 'pending'    && <><Clock size={18} color="#f97316"/> Votre commande attend la confirmation du restaurant</>}
+                {order.status === 'preparing'  && <><Package size={18} color="#8b5cf6"/> Le restaurant prépare votre commande...</>}
+                {order.status === 'on_the_way' && <><Bike size={18} color="#3b82f6"/> Le livreur est en route vers vous!</>}
+                {order.status === 'delivered'  && <><CheckCircle size={18} color="#22c55e"/> Commande livrée! Bon appétit!</>}
               </p>
             </div>
           </div>
         )}
 
         {order.status === 'cancelled' && (
-          <div style={{ background: '#fef2f2', borderRadius: '20px', padding: '24px', marginBottom: '20px', border: '1px solid #fca5a5', textAlign: 'center' }}>
-            <p style={{ margin: 0, color: '#b91c1c', fontWeight: '800', fontSize: '16px' }}>❌ Cette commande a été annulée</p>
+          <div style={{ background: '#fef2f2', borderRadius: '20px', padding: '24px', marginBottom: '20px', border: '1px solid #fca5a5', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <XCircle size={20} color="#b91c1c"/>
+            <p style={{ margin: 0, color: '#b91c1c', fontWeight: '800', fontSize: '16px' }}>Cette commande a été annulée</p>
           </div>
         )}
 
@@ -213,7 +214,7 @@ export default function OrderTracking() {
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
               {driverPos && (
                 <Marker position={driverPos} icon={bikeIcon}>
-                  <Popup>🛵 Livreur en route</Popup>
+                  <Popup>Livreur en route</Popup>
                 </Marker>
               )}
               <MapUpdater center={driverPos} />
@@ -235,8 +236,8 @@ export default function OrderTracking() {
             <span style={{ color: '#A51C1C' }}>{Number(order.total_price).toFixed(2)} MAD</span>
           </div>
           <div style={{ marginTop: '14px', padding: '12px 16px', background: '#f9f9f9', borderRadius: '12px' }}>
-            <p style={{ margin: '3px 0', fontSize: '13px', color: '#666' }}>📍 Livraison: {order.address}</p>
-            <p style={{ margin: '3px 0', fontSize: '13px', color: '#666' }}>💳 Paiement: {order.payment_method === 'card' ? 'Carte bancaire' : 'Cash à la livraison'}</p>
+            <p style={{ margin: '3px 0', fontSize: '13px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={13} color="#666"/> Livraison: {order.address}</p>
+            <p style={{ margin: '3px 0', fontSize: '13px', color: '#666', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={13} color="#666"/> Paiement: {order.payment_method === 'card' ? 'Carte bancaire' : 'Cash à la livraison'}</p>
           </div>
         </div>
 
@@ -253,10 +254,10 @@ export default function OrderTracking() {
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 {[1,2,3,4,5].map(s => (
                   <button key={s} type="button" onClick={() => setRating(s)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '32px', transition: 'transform 0.1s' }}
-                    onMouseEnter={e => e.target.style.transform = 'scale(1.2)'}
-                    onMouseLeave={e => e.target.style.transform = 'scale(1)'}>
-                    {s <= rating ? '⭐' : '☆'}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', transition: 'transform 0.1s' }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                    <Star size={28} fill={s <= rating ? '#f59e0b' : 'none'} color={s <= rating ? '#f59e0b' : '#d1d5db'} strokeWidth={1.5}/>
                   </button>
                 ))}
               </div>
@@ -274,8 +275,9 @@ export default function OrderTracking() {
         )}
 
         {reviewed && (
-          <div style={{ background: '#f0fdf4', borderRadius: '20px', padding: '24px', textAlign: 'center', border: '1px solid #86efac' }}>
-            <p style={{ margin: 0, color: '#15803d', fontWeight: '800', fontSize: '16px' }}>✅ Merci pour votre avis!</p>
+          <div style={{ background: '#f0fdf4', borderRadius: '20px', padding: '24px', textAlign: 'center', border: '1px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <CheckCircle size={20} color="#15803d"/>
+            <p style={{ margin: 0, color: '#15803d', fontWeight: '800', fontSize: '16px' }}>Merci pour votre avis!</p>
           </div>
         )}
 

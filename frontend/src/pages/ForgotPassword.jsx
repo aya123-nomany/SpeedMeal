@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail } from 'lucide-react';
+import { ArrowLeft, Mail, Lock } from 'lucide-react';
+import axios from 'axios';
 import logoUrl from '../assets/logo.png';
+
+const API = 'http://localhost:5000/api/auth';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
-  const [isSent, setIsSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [step, setStep] = useState(1); // 1: email, 2: otp, 3: success
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const inputStyle = {
@@ -21,6 +28,32 @@ const ForgotPassword = () => {
     color: '#111',
     boxSizing: 'border-box',
     transition: 'all 0.3s ease'
+  };
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await axios.post(`${API}/send-otp`, { email });
+      setStep(2);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur lors de l\'envoi de l\'OTP');
+    }
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await axios.post(`${API}/verify-otp`, { email, otp, newPassword });
+      setStep(3);
+    } catch (err) {
+      setError(err.response?.data?.message || 'OTP invalide ou expiré');
+    }
+    setLoading(false);
   };
 
   return (
@@ -89,24 +122,23 @@ const ForgotPassword = () => {
             <img src={logoUrl} alt="SpeedMeal" style={{ height: '100px', objectFit: 'contain' }} />
           </div>
 
-          {!isSent ? (
+          {step === 1 ? (
             <>
               {/* Title */}
               <h2 style={{ fontSize: '30px', fontWeight: '800', color: '#111', marginBottom: '10px', letterSpacing: '-1px' }}>
-                Forgot Password?
+                Mot de passe oublié ?
               </h2>
               <p style={{ color: '#777', marginBottom: '35px', fontSize: '15px', fontWeight: '500', lineHeight: '1.6' }}>
-                Enter your email address and we'll send you a link to reset your password.
+                Entrez votre email et nous vous enverrons un code de réinitialisation.
               </p>
 
               {/* Form */}
-              <form onSubmit={(e) => { e.preventDefault(); setIsSent(true); }} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-
+              <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="email"
                     required
-                    placeholder="Email Address"
+                    placeholder="Adresse email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={inputStyle}
@@ -123,39 +155,156 @@ const ForgotPassword = () => {
                   />
                 </div>
 
+                {error && <p style={{ color: '#DC2626', fontSize: '13px', fontWeight: '600' }}>{error}</p>}
+
                 <motion.button
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
+                  disabled={loading}
                   style={{
                     width: '100%',
                     padding: '20px',
                     borderRadius: '20px',
                     border: 'none',
-                    background: '#A51C1C',
+                    background: loading ? '#c97a7a' : '#A51C1C',
                     color: '#fff',
                     fontSize: '17px',
                     fontWeight: '800',
-                    cursor: 'pointer',
+                    cursor: loading ? 'not-allowed' : 'pointer',
                     marginTop: '15px',
                     boxShadow: '0 12px 25px rgba(165, 28, 28, 0.25)',
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  Send Reset Link
+                  {loading ? 'Envoi en cours...' : 'Envoyer le code'}
                 </motion.button>
+              </form>
+            </>
+          ) : step === 2 ? (
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  background: '#FFF5F2',
+                  color: '#A51C1C',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 30px'
+                }}>
+                  <Mail size={40} />
+                </div>
+                <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#111', marginBottom: '10px' }}>
+                  Entrez le code
+                </h2>
+                <p style={{ color: '#777', marginBottom: '35px', fontSize: '15px', fontWeight: '500', lineHeight: '1.6' }}>
+                  Code envoyé à <strong style={{ color: '#111' }}>{email}</strong>
+                </p>
+              </motion.div>
+
+              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Code à 6 chiffres"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    maxLength={6}
+                    style={{ ...inputStyle, textAlign: 'center', letterSpacing: '8px', fontSize: '24px', fontWeight: '700' }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#A51C1C';
+                      e.target.style.background = '#fff';
+                      e.target.style.boxShadow = '0 0 0 4px rgba(165, 28, 28, 0.06)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#f0f0f0';
+                      e.target.style.background = '#fafafa';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <Lock size={18} style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: '#bbb' }} />
+                  <input
+                    type="password"
+                    required
+                    placeholder="Nouveau mot de passe"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    style={{ ...inputStyle, paddingLeft: '50px' }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#A51C1C';
+                      e.target.style.background = '#fff';
+                      e.target.style.boxShadow = '0 0 0 4px rgba(165, 28, 28, 0.06)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#f0f0f0';
+                      e.target.style.background = '#fafafa';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                </div>
+
+                {error && <p style={{ color: '#DC2626', fontSize: '13px', fontWeight: '600' }}>{error}</p>}
+
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '20px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    background: loading ? '#c97a7a' : '#A51C1C',
+                    color: '#fff',
+                    fontSize: '17px',
+                    fontWeight: '800',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    marginTop: '15px',
+                    boxShadow: '0 12px 25px rgba(165, 28, 28, 0.25)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {loading ? 'Vérification...' : 'Réinitialiser'}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#777',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Changer d'email
+                </button>
               </form>
             </>
           ) : (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
             >
               <div style={{
                 width: '80px',
                 height: '80px',
-                background: '#FFF5F2',
-                color: '#A51C1C',
+                background: '#F0FDF4',
+                color: '#16A34A',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -165,26 +314,31 @@ const ForgotPassword = () => {
                 <Mail size={40} />
               </div>
               <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#111', marginBottom: '10px' }}>
-                Check your Email
+                Mot de passe réinitialisé !
               </h2>
               <p style={{ color: '#777', marginBottom: '35px', fontSize: '15px', fontWeight: '500', lineHeight: '1.6' }}>
-                We've sent a password reset link to <br />
-                <strong style={{ color: '#111' }}>{email}</strong>
+                Votre mot de passe a été réinitialisé avec succès.
               </p>
-              <button
-                onClick={() => setIsSent(false)}
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/login')}
                 style={{
-                  background: 'none',
+                  width: '100%',
+                  padding: '20px',
+                  borderRadius: '20px',
                   border: 'none',
-                  color: '#A51C1C',
+                  background: '#A51C1C',
+                  color: '#fff',
+                  fontSize: '17px',
                   fontWeight: '800',
-                  fontSize: '15px',
                   cursor: 'pointer',
-                  textDecoration: 'underline'
+                  boxShadow: '0 12px 25px rgba(165, 28, 28, 0.25)',
+                  transition: 'all 0.3s ease'
                 }}
               >
-                Didn't receive the email? Try again
-              </button>
+                Se connecter
+              </motion.button>
             </motion.div>
           )}
 

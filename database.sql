@@ -249,3 +249,23 @@ CREATE TABLE IF NOT EXISTS otp_codes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_phone (phone)
 );
+-- New database tables
+CREATE TABLE restaurant_earnings (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  restaurant_id INT,
+  date DATE,
+  orders_count INT,
+  total_revenue DECIMAL(10,2),
+  commission_fee DECIMAL(10,2),
+  net_earnings DECIMAL(10,2),
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id)
+);
+CREATE TABLE restaurant_staff (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  restaurant_id INT,
+  user_id INT,
+  role ENUM('manager', 'cashier', 'kitchen'),
+  permissions JSON,
+  FOREIGN KEY (restaurant_id) REFERENCES restaurants(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);

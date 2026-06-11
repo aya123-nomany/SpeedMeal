@@ -1,275 +1,115 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, User, Mail, Lock, Phone, MapPin, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import logoUrl from '../assets/logo.png';
 
-const Signup = () => {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    location: '',
-    dateOfBirth: '',
-    mobileNumber: '',
-    email: '',
-    password: ''
-  });
-  const [error, setError] = useState('');
+const API = 'http://localhost:5000/api/auth';
+
+export default function Signup() {
+  const [form, setForm]       = useState({ name:'', email:'', password:'', phone:'', address:'' });
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
-    const { fullName, email, password, mobileNumber, location } = formData;
-    if (!fullName || !email || !password) {
-      setError('Full name, email, and password are required.');
+    if (!form.name || !form.email || !form.password) {
+      setError('Nom, email et mot de passe sont obligatoires.');
       return;
     }
     setLoading(true);
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/register', {
-        name: fullName,
-        email,
-        password,
-        phone: mobileNumber || null,
-        address: location || null,
-        role: 'client'
+      const { data } = await axios.post(`${API}/register`, {
+        name: form.name, email: form.email, password: form.password,
+        phone: form.phone || null, address: form.address || null, role: 'client',
       });
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.message || 'Erreur lors de l\'inscription.');
     }
+    setLoading(false);
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '18px 24px',
-    borderRadius: '16px',
-    border: '1.5px solid #f0f0f0',
-    fontSize: '16px',
-    fontWeight: '500',
-    outline: 'none',
-    background: '#fafafa',
-    color: '#111',
-    boxSizing: 'border-box',
-    transition: 'all 0.3s ease'
+  const inp = {
+    width:'100%', padding:'14px 16px 14px 44px', borderRadius:'14px',
+    border:'1.5px solid #f0f0f0', fontSize:'15px', fontWeight:'500',
+    outline:'none', background:'#fafafa', color:'#111',
+    boxSizing:'border-box', transition:'all 0.2s',
   };
+  const focus = e => { e.target.style.borderColor='#A51C1C'; e.target.style.background='#fff'; e.target.style.boxShadow='0 0 0 4px rgba(165,28,28,0.06)'; };
+  const blur  = e => { e.target.style.borderColor='#f0f0f0'; e.target.style.background='#fafafa'; e.target.style.boxShadow='none'; };
+  const iconStyle = { position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#bbb' };
 
-  const inputFocus = (e) => {
-    e.target.style.borderColor = '#A51C1C';
-    e.target.style.background = '#fff';
-    e.target.style.boxShadow = '0 0 0 4px rgba(165, 28, 28, 0.05)';
-  };
-
-  const inputBlur = (e) => {
-    e.target.style.borderColor = '#f0f0f0';
-    e.target.style.background = '#fafafa';
-    e.target.style.boxShadow = 'none';
-  };
+  const Field = ({ icon, type='text', placeholder, k, rightEl }) => (
+    <div style={{ position:'relative' }}>
+      <span style={iconStyle}>{icon}</span>
+      <input type={rightEl ? (showPass ? 'text' : 'password') : type}
+        placeholder={placeholder} value={form[k]} onChange={set(k)}
+        style={{ ...inp, ...(rightEl && { paddingRight:'46px' }) }}
+        onFocus={focus} onBlur={blur} />
+      {rightEl && (
+        <button type="button" onClick={() => setShowPass(v => !v)}
+          style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#aaa', display:'flex' }}>
+          {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#fff',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Decorative Background Blobs */}
-      <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(165, 28, 28, 0.04) 0%, transparent 70%)', borderRadius: '50%', zIndex: 0 }}></div>
-      <div style={{ position: 'absolute', bottom: '-150px', left: '-150px', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(165, 28, 28, 0.03) 0%, transparent 70%)', borderRadius: '50%', zIndex: 0 }}></div>
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', background:'#fff', position:'relative', overflow:'hidden' }}>
+      <div style={{ position:'absolute', top:'-100px', right:'-100px', width:'400px', height:'400px', background:'radial-gradient(circle, rgba(165,28,28,0.04) 0%, transparent 70%)', borderRadius:'50%', zIndex:0 }} />
 
-      {/* Back Button */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', paddingTop: '30px', paddingLeft: '30px', position: 'relative', zIndex: 10 }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            background: '#fff',
-            border: '1px solid #eee',
-            cursor: 'pointer',
-            color: '#111',
-            padding: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            transition: 'all 0.3s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(-5px)'; e.currentTarget.style.background = '#fafafa'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.background = '#fff'; }}
-        >
+      <div style={{ padding:'30px 0 0 30px', position:'relative', zIndex:10 }}>
+        <button onClick={() => navigate(-1)} style={{ background:'#fff', border:'1px solid #eee', cursor:'pointer', padding:'12px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', boxShadow:'0 4px 12px rgba(0,0,0,0.05)' }}>
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
       </div>
 
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          style={{
-            width: '100%',
-            maxWidth: '500px',
-            background: '#fff',
-            padding: '50px 40px',
-            borderRadius: '32px',
-            border: '1px solid #f2f2f2',
-            boxShadow: '0 25px 60px -15px rgba(0,0,0,0.06)'
-          }}
-        >
-          {/* Logo */}
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <img src={logoUrl} alt="SpeedMeal Logo" style={{ height: '100px', objectFit: 'contain' }} />
+      <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px 20px 40px', position:'relative', zIndex:1 }}>
+        <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} transition={{ duration:0.4 }}
+          style={{ width:'100%', maxWidth:'460px', background:'#fff', padding:'44px 40px', borderRadius:'32px', border:'1px solid #f2f2f2', boxShadow:'0 25px 60px -15px rgba(0,0,0,0.07)' }}>
+
+          <div style={{ textAlign:'center', marginBottom:'24px' }}>
+            <img src={logoUrl} alt="SpeedMeal" style={{ height:'80px', objectFit:'contain' }} />
           </div>
 
-          {/* Title */}
-          <h2 style={{ fontSize: '30px', fontWeight: '800', color: '#111', marginBottom: '10px', textAlign: 'center', letterSpacing: '-1px' }}>
-            Create Account
-          </h2>
-          <p style={{ color: '#777', textAlign: 'center', marginBottom: '35px', fontSize: '15px', fontWeight: '500' }}>
-            Join our community of food lovers today!
-          </p>
+          <h2 style={{ fontSize:'26px', fontWeight:'900', color:'#111', marginBottom:'6px', textAlign:'center', letterSpacing:'-0.5px' }}>Créer un compte</h2>
+          <p style={{ color:'#888', textAlign:'center', marginBottom:'24px', fontSize:'14px' }}>Rejoignez SpeedMeal aujourd'hui</p>
 
-          {/* Form */}
-          <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-
-            <input
-              type="text"
-              name="fullName"
-              placeholder="Full Name"
-              value={formData.fullName}
-              onChange={handleChange}
-              style={inputStyle}
-              onFocus={inputFocus}
-              onBlur={inputBlur}
-            />
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-              <input
-                type="text"
-                name="location"
-                placeholder="Location"
-                value={formData.location}
-                onChange={handleChange}
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
-              />
-
-              <input
-                type="text"
-                name="dateOfBirth"
-                placeholder="Birth Date"
-                value={formData.dateOfBirth}
-                onChange={handleChange}
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
-              />
-            </div>
-
-            <input
-              type="tel"
-              name="mobileNumber"
-              placeholder="Mobile Number"
-              value={formData.mobileNumber}
-              onChange={handleChange}
-              style={inputStyle}
-              onFocus={inputFocus}
-              onBlur={inputBlur}
-            />
-
-            <input
-              type="email"
-              name="email"
-              placeholder="Email Address"
-              value={formData.email}
-              onChange={handleChange}
-              style={inputStyle}
-              onFocus={inputFocus}
-              onBlur={inputBlur}
-            />
-
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              style={inputStyle}
-              onFocus={inputFocus}
-              onBlur={inputBlur}
-            />
+          <form onSubmit={handleSignup} style={{ display:'flex', flexDirection:'column', gap:'13px' }}>
+            <Field icon={<User size={16} />}  placeholder="Nom complet *" k="name" />
+            <Field icon={<Mail size={16} />}  type="email" placeholder="Email *" k="email" />
+            <Field icon={<Lock size={16} />}  placeholder="Mot de passe *" k="password" rightEl={true} />
+            <Field icon={<Phone size={16} />} type="tel" placeholder="Téléphone (optionnel)" k="phone" />
+            <Field icon={<MapPin size={16} />} placeholder="Adresse (optionnel)" k="address" />
 
             {error && (
-              <div style={{ background: '#fff0f0', border: '1px solid #fca5a5', borderRadius: '12px', padding: '12px 16px', color: '#b91c1c', fontSize: '14px', fontWeight: '600' }}>
+              <div style={{ background:'#fff0f0', border:'1px solid #fca5a5', borderRadius:'12px', padding:'12px 16px', color:'#b91c1c', fontSize:'14px', fontWeight:'600' }}>
                 {error}
               </div>
             )}
 
-            <motion.button
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '20px',
-                borderRadius: '20px',
-                border: 'none',
-                background: loading ? '#c97a7a' : '#A51C1C',
-                color: '#fff',
-                fontSize: '17px',
-                fontWeight: '800',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                marginTop: '15px',
-                boxShadow: '0 12px 25px rgba(165, 28, 28, 0.25)',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {loading ? 'Creating account...' : 'Sign Up'}
+            <motion.button whileHover={{ y:-2 }} whileTap={{ scale:0.97 }} type="submit" disabled={loading}
+              style={{ width:'100%', padding:'17px', borderRadius:'16px', border:'none', background: loading ? '#c97a7a' : '#A51C1C', color:'#fff', fontWeight:'800', fontSize:'15px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow:'0 10px 25px rgba(165,28,28,0.22)', marginTop:'4px' }}>
+              {loading ? 'Création...' : 'Créer mon compte'}
             </motion.button>
           </form>
 
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', margin: '35px 0', gap: '15px' }}>
-            <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
-            <span style={{ color: '#aaa', fontSize: '13px', fontWeight: '600' }}>or sign up with</span>
-            <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
-          </div>
-
-          <div style={{ textAlign: 'center', color: '#777', fontSize: '15px', fontWeight: '600' }}>
-            Already have an account?{' '}
-            <Link to="/login" style={{ color: '#A51C1C', fontWeight: '800', textDecoration: 'none' }}>
-              Login
-            </Link>
-          </div>
+          <p style={{ textAlign:'center', marginTop:'24px', color:'#777', fontSize:'14px' }}>
+            Déjà un compte ?{' '}
+            <Link to="/login" style={{ color:'#A51C1C', fontWeight:'800', textDecoration:'none' }}>Se connecter</Link>
+          </p>
         </motion.div>
       </div>
     </div>
   );
-};
-
-export default Signup;
+}
