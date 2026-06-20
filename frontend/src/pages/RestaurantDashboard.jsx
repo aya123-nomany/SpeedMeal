@@ -18,7 +18,7 @@ import logoUrl from '../assets/logo.png';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 const C = {
   red: '#A51C1C', dark: '#111', bg: '#F4F6FB',

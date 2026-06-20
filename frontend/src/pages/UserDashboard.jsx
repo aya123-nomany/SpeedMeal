@@ -37,7 +37,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 const inputStyle = {
   width: '100%', padding: '13px 16px', borderRadius: '12px',
@@ -80,7 +80,7 @@ export default function UserDashboard() {
     fetchComplaints();
 
     // Socket.io for real time updates
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io('https://speedmeal.ayaennoamany.workers.dev');
     
     // Listen to order status updates and refresh orders
     socketRef.current.on('orderStatusUpdate', () => {

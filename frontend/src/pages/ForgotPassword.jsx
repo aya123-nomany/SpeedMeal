@@ -5,7 +5,7 @@ import { ArrowLeft, Mail, Lock } from 'lucide-react';
 import axios from 'axios';
 import logoUrl from '../assets/logo.png';
 
-const API = 'http://localhost:5000/api/auth';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api/auth';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');

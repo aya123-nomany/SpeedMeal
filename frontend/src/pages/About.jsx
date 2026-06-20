@@ -76,7 +76,7 @@ const About = () => {
   const { t } = useLanguage();
 
   React.useEffect(() => {
-    axios.get('http://localhost:5000/api/public-stats')
+    axios.get('https://speedmeal.ayaennoamany.workers.dev/api/public-stats')
       .then(res => setStats(res.data))
       .catch(err => console.error(err));
   }, []);

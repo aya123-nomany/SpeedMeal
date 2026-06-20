@@ -79,7 +79,7 @@ const CANCEL_REASONS = [
   { value: 'other', label: 'Autre' }
 ];
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 export default function OrderTracking() {
   const { id } = useParams();
@@ -124,7 +124,7 @@ export default function OrderTracking() {
     fetchOrder();
 
     // Socket.io for real-time updates
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io('https://speedmeal.ayaennoamany.workers.dev');
     socketRef.current.emit('joinOrder', id);
 
     socketRef.current.on('orderStatusUpdate', ({ orderId, status }) => {

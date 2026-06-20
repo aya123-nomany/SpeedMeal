@@ -9,7 +9,7 @@ import {
   Lock, Wifi, Shield
 } from 'lucide-react';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 export default function Checkout() {
   const navigate = useNavigate();

@@ -55,7 +55,7 @@ const MapBounds = ({ positions }) => {
   return null;
 };
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 const statusColors = {
   pending:    { bg: '#fff7ed', color: '#c2410c', label: 'En attente' },

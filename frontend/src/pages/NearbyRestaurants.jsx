@@ -63,9 +63,9 @@ export default function NearbyRestaurants() {
       let url;
       if (useNearMe && userLocation) {
         // When using near me, fetch from a broader area or use all cities
-        url = `http://localhost:5000/api/openmenu/location?country=MA`;
+        url = `https://speedmeal.ayaennoamany.workers.dev/api/openmenu/location?country=MA`;
       } else {
-        url = `http://localhost:5000/api/openmenu/location?city=${selectedCity}&country=MA`;
+        url = `https://speedmeal.ayaennoamany.workers.dev/api/openmenu/location?city=${selectedCity}&country=MA`;
       }
 
       const response = await fetch(url);
@@ -147,7 +147,7 @@ export default function NearbyRestaurants() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/openmenu/nearby?lat=${center.lat}&lng=${center.lng}&radius=${distanceFilter || 5}`
+        `https://speedmeal.ayaennoamany.workers.dev/api/openmenu/nearby?lat=${center.lat}&lng=${center.lng}&radius=${distanceFilter || 5}`
       );
       const data = await response.json();
 

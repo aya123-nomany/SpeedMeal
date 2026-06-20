@@ -200,7 +200,7 @@ const SignupModal = ({ isOpen, onClose }) => {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const response = await axios.post('https://speedmeal.ayaennoamany.workers.dev/api/auth/register', {
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -336,7 +336,7 @@ const Partner = () => {
   const [stats, setStats] = React.useState({ totalRestaurants: 0, totalClients: 0 });
 
   React.useEffect(() => {
-    axios.get('http://localhost:5000/api/public-stats')
+    axios.get('https://speedmeal.ayaennoamany.workers.dev/api/public-stats')
       .then(res => setStats(res.data))
       .catch(err => console.error(err));
   }, []);

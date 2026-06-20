@@ -123,7 +123,7 @@ export default function RestaurantsSection() {
     const load = async () => {
       setLoading(true);
       try {
-        const { data } = await axios.get('http://localhost:5000/api/restaurants');
+        const { data } = await axios.get('https://speedmeal.ayaennoamany.workers.dev/api/restaurants');
         if (data.filter(r => r.isVerified).length > 0) {
           setRestaurants(data.filter(r => r.isVerified));
         } else {

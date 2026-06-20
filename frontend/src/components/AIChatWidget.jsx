@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { X, Send, Bot, Sparkles, RotateCcw } from 'lucide-react';
 
-const API = 'http://localhost:5000/api/ai/chat';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api/ai/chat';
 
 /* ── SparkSVG matching SectionTitle style ── */
 const SparkSVG = () => (
@@ -50,7 +50,7 @@ export default function AIChatWidget() {
   /* Fetch public site data once widget first opens */
   useEffect(() => {
     if (open && !siteData) {
-      axios.get('http://localhost:5000/api/restaurants')
+      axios.get('https://speedmeal.ayaennoamany.workers.dev/api/restaurants')
         .then(r => {
           const restaurants = Array.isArray(r.data) ? r.data : (r.data.restaurants || []);
           setSiteData({ restaurants });

@@ -36,7 +36,7 @@ const FeaturesSection = () => {
   const [totalDishes, setTotalDishes] = React.useState(0);
 
   React.useEffect(() => {
-    axios.get('http://localhost:5000/api/public-stats')
+    axios.get('https://speedmeal.ayaennoamany.workers.dev/api/public-stats')
       .then(res => setTotalDishes(res.data.totalDishes || 0))
       .catch(err => console.error(err));
   }, []);

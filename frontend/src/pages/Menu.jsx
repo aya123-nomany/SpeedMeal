@@ -15,7 +15,7 @@ import {
 } from '../services/openMenuAPI';
 import logoUrl from '../assets/logo.png';
 
-const API = 'http://localhost:5000/api';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api';
 
 // ── Cart Button ──────────────────────────────────────────────────────────────
 const CartButton = ({ count, total, onClick }) => {

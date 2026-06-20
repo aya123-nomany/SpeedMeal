@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import logoUrl from '../assets/logo.png';
 
-const API = 'http://localhost:5000/api/auth';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api/auth';
 
 export default function Login() {
   const [email, setEmail]       = useState('');

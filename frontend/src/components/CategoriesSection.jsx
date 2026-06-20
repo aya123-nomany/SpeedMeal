@@ -73,7 +73,7 @@ const CategoriesSection = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await axios.get('http://localhost:5000/api/restaurants/menu-categories');
+        const { data } = await axios.get('https://speedmeal.ayaennoamany.workers.dev/api/restaurants/menu-categories');
         setCategories(data);
       } catch (err) {
         console.error('Failed to load categories:', err);

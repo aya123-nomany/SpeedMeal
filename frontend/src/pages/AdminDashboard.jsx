@@ -27,7 +27,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 import { useLanguage } from '../context/LanguageContext';
 
 /* ── constants ── */
-const API    = 'http://localhost:5000/api/admin';
+const API    = 'https://speedmeal.ayaennoamany.workers.dev/api/admin';
 const ROLES  = ['client', 'restaurant', 'delivery', 'admin'];
 const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 const SHORT_MONTHS = ['J','F','M','A','M','J','J','A','S','O','N','D'];
@@ -176,7 +176,7 @@ const AdminDashboard = () => {
   const fetchRestaurants = () => load(() => get('restaurants'), setRestaurants);
 
   const fetchCoupons     = () => load(
-    () => axios.get('http://localhost:5000/api/coupons', { headers:{ Authorization:`Bearer ${token}` } }),
+    () => axios.get('https://speedmeal.ayaennoamany.workers.dev/api/coupons', { headers:{ Authorization:`Bearer ${token}` } }),
     setCoupons
   );
 
@@ -184,13 +184,13 @@ const AdminDashboard = () => {
   const fetchReviews     = () => load(() => get('reviews'),     setReviews);
   
   const fetchComplaints  = () => load(
-    () => axios.get('http://localhost:5000/api/complaints', { headers:{ Authorization:`Bearer ${token}` } }),
+    () => axios.get('https://speedmeal.ayaennoamany.workers.dev/api/complaints', { headers:{ Authorization:`Bearer ${token}` } }),
     setComplaints
   );
 
   const updateComplaintStatus = async (id, status) => {
     try {
-      await axios.put(`http://localhost:5000/api/complaints/${id}/status`,
+      await axios.put(`https://speedmeal.ayaennoamany.workers.dev/api/complaints/${id}/status`,
         { status },
         { headers:{ Authorization:`Bearer ${token}` } }
       );
@@ -202,7 +202,7 @@ const AdminDashboard = () => {
 
   const fetchComplaintOrderDetails = async (orderId) => {
     try {
-      const { data } = await axios.get(`http://localhost:5000/api/orders/${orderId}`, {
+      const { data } = await axios.get(`https://speedmeal.ayaennoamany.workers.dev/api/orders/${orderId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSelectedComplaintOrder(data);
@@ -215,7 +215,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!selectedNotifyComplaint || !notifyForm.title || !notifyForm.message) return;
     try {
-      await axios.post(`http://localhost:5000/api/complaints/${selectedNotifyComplaint.id}/notify`,
+      await axios.post(`https://speedmeal.ayaennoamany.workers.dev/api/complaints/${selectedNotifyComplaint.id}/notify`,
         notifyForm,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -230,21 +230,21 @@ const AdminDashboard = () => {
 
   const fetchNotifications = async () => {
     try {
-      const { data } = await axios.get('http://localhost:5000/api/notifications', { headers:{ Authorization:`Bearer ${token}` } });
+      const { data } = await axios.get('https://speedmeal.ayaennoamany.workers.dev/api/notifications', { headers:{ Authorization:`Bearer ${token}` } });
       setNotifications(data);
     } catch {}
   };
 
   const markAsRead = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.put(`https://speedmeal.ayaennoamany.workers.dev/api/notifications/${id}/read`, {}, { headers:{ Authorization:`Bearer ${token}` } });
       fetchNotifications();
     } catch {}
   };
 
   const markAllAsRead = async () => {
     try {
-      await axios.put('http://localhost:5000/api/notifications/read-all', {}, { headers:{ Authorization:`Bearer ${token}` } });
+      await axios.put('https://speedmeal.ayaennoamany.workers.dev/api/notifications/read-all', {}, { headers:{ Authorization:`Bearer ${token}` } });
       fetchNotifications();
     } catch {}
   };
@@ -261,7 +261,7 @@ const AdminDashboard = () => {
   const fetchInsights = async () => {
     setInsightsLoading(true);
     try {
-      const { data } = await axios.get('http://localhost:5000/api/ai/forecast/insights', {
+      const { data } = await axios.get('https://speedmeal.ayaennoamany.workers.dev/api/ai/forecast/insights', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAiInsights(data);
@@ -290,7 +290,7 @@ const AdminDashboard = () => {
 
     try {
       const { data } = await axios.post(
-        'http://localhost:5000/api/ai/chat',
+        'https://speedmeal.ayaennoamany.workers.dev/api/ai/chat',
         { message: msg, history, context: siteContext },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -360,8 +360,8 @@ const AdminDashboard = () => {
   const toggleResto  = id     => put(`restaurants/${id}/toggle`).then(fetchRestaurants);
   const deleteResto  = id     => window.confirm('Supprimer?') && del(`restaurants/${id}`).then(fetchRestaurants);
   const deleteReview = id     => window.confirm('Supprimer?') && del(`reviews/${id}`).then(fetchReviews);
-  const toggleCoupon = id     => axios.put(`http://localhost:5000/api/coupons/${id}/toggle`,{},{headers:{Authorization:`Bearer ${token}`}}).then(fetchCoupons);
-  const deleteCoupon = id     => window.confirm('Supprimer?') && axios.delete(`http://localhost:5000/api/coupons/${id}`,{headers:{Authorization:`Bearer ${token}`}}).then(fetchCoupons);
+  const toggleCoupon = id     => axios.put(`https://speedmeal.ayaennoamany.workers.dev/api/coupons/${id}/toggle`,{},{headers:{Authorization:`Bearer ${token}`}}).then(fetchCoupons);
+  const deleteCoupon = id     => window.confirm('Supprimer?') && axios.delete(`https://speedmeal.ayaennoamany.workers.dev/api/coupons/${id}`,{headers:{Authorization:`Bearer ${token}`}}).then(fetchCoupons);
   const handleLogout = ()     => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/'); };
 
   /* ── chart data ── */
@@ -1143,7 +1143,7 @@ const AdminDashboard = () => {
                     <p style={{ margin:'0 0 16px', fontWeight:800, fontSize:14, color:C.text, display:'flex', alignItems:'center', gap:7 }}><Plus size={15} color={C.red}/>Créer un coupon</p>
                     <form onSubmit={async e => {
                       e.preventDefault();
-                      try { await axios.post('http://localhost:5000/api/coupons', couponForm, { headers:{ Authorization:`Bearer ${token}` } }); setCouponForm({ code:'', discount_type:'percentage', discount_value:'', min_order:'', max_uses:'' }); fetchCoupons(); }
+                      try { await axios.post('https://speedmeal.ayaennoamany.workers.dev/api/coupons', couponForm, { headers:{ Authorization:`Bearer ${token}` } }); setCouponForm({ code:'', discount_type:'percentage', discount_value:'', min_order:'', max_uses:'' }); fetchCoupons(); }
                       catch(err) { alert(err.response?.data?.message||'Erreur'); }
                     }} style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10 }}>
                       {[{ ph:'Code *', key:'code', tf:v=>v.toUpperCase() },{ ph:'Valeur *', key:'discount_value', type:'number' },{ ph:'Commande min', key:'min_order', type:'number' },{ ph:'Utilisations max', key:'max_uses', type:'number' }].map(({ ph, key, type='text', tf }) => (

@@ -5,7 +5,7 @@ import { ArrowLeft, User, Mail, Lock, Phone, MapPin, Eye, EyeOff } from 'lucide-
 import axios from 'axios';
 import logoUrl from '../assets/logo.png';
 
-const API = 'http://localhost:5000/api/auth';
+const API = 'https://speedmeal.ayaennoamany.workers.dev/api/auth';
 
 const inp = {
   width:'100%', padding:'14px 16px 14px 44px', borderRadius:'14px',

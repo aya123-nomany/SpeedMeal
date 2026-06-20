@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // All calls go through our Express proxy → no CORS issues
-const PROXY = 'http://localhost:5000/api/openmenu';
+const PROXY = 'https://speedmeal.ayaennoamany.workers.dev/api/openmenu';
 
 /**
  * Search restaurants + menu items

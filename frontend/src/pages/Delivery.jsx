@@ -251,7 +251,7 @@ const SignupModal = ({ isOpen, onClose }) => {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      await axios.post('http://localhost:5000/api/auth/register', {
+      await axios.post('https://speedmeal.ayaennoamany.workers.dev/api/auth/register', {
         name: form.name,
         email: form.email,
         password: form.password,
