@@ -22,6 +22,7 @@ const ALLOWED_ORIGINS = [
     'http://192.168.1.11:5176',
     'http://192.168.1.11:5177',
     'http://192.168.1.11:5178',
+    'https://speed-meal.vercel.app',
 ];
 
 const io = new Server(server, {
