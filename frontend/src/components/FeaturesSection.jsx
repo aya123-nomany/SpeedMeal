@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Zap, ClipboardList, Map, UtensilsCrossed } from 'lucide-react';
+import axios from 'axios';
 
 const FeatureItem = ({ icon: Icon, title, description }) => (
   <motion.div 
@@ -32,6 +33,14 @@ const FeatureItem = ({ icon: Icon, title, description }) => (
 );
 
 const FeaturesSection = () => {
+  const [totalDishes, setTotalDishes] = React.useState(0);
+
+  React.useEffect(() => {
+    axios.get('http://localhost:5000/api/public-stats')
+      .then(res => setTotalDishes(res.data.totalDishes || 0))
+      .catch(err => console.error(err));
+  }, []);
+
   return (
     <section style={{ padding: '100px 0', background: '#fff9e6', borderRadius: '50px', margin: '0 20px' }}>
       <div className="container">
@@ -68,7 +77,7 @@ const FeaturesSection = () => {
           />
           <FeatureItem 
             icon={UtensilsCrossed}
-            title="More Than 160+ Dish"
+            title={`Plus de ${totalDishes || 160} Plats`}
             description="The majority have the best quality food and amazing offers."
           />
         </div>

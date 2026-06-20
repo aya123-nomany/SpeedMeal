@@ -1,29 +1,39 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { io } from 'socket.io-client';
 import {
   User, ShoppingBag, LogOut, MapPin, Phone,
   Mail, Clock, ChevronRight, Home, Settings,
   Package, Star, Edit3, Check, X, Heart, Bell,
-  Plus, Trash2, RefreshCw, Eye, Bike, Tag
+  Plus, Trash2, RefreshCw, Eye, Bike, Tag, AlertCircle, Send, Store, Globe
 } from 'lucide-react';
 
 const STATUS = {
-  pending:    { bg: '#fff7ed', color: '#c2410c', dot: '#f97316', label: 'En attente' },
-  preparing:  { bg: '#fefce8', color: '#a16207', dot: '#eab308', label: 'En préparation' },
-  on_the_way: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'En route' },
-  delivered:  { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Livré' },
-  cancelled:  { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Annulé' },
+  pending:              { bg: '#fff7ed', color: '#c2410c', dot: '#f97316', label: 'En attente' },
+  accepted:             { bg: '#fefce8', color: '#a16207', dot: '#eab308', label: 'Acceptée' },
+  preparing:            { bg: '#fefce8', color: '#a16207', dot: '#eab308', label: 'En préparation' },
+  ready:                { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'Prête' },
+  searching_driver:     { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'Recherche livreur' },
+  driver_assigned:      { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'Livreur assigné' },
+  driver_at_restaurant: { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'Livreur au resto' },
+  on_the_way:           { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6', label: 'En route' },
+  delivered:            { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e', label: 'Livré' },
+  cancelled:            { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444', label: 'Annulé' },
 };
 
 const StatusBadge = ({ status }) => {
   const s = STATUS[status] || { bg: '#f5f5f5', color: '#555', dot: '#aaa', label: status };
   return (
-    <span style={{ background: s.bg, color: s.color, padding: '5px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
+    <motion.button
+      whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+      whileTap={{ scale: 0.97 }}
+      style={{ background: s.bg, color: s.color, padding: '6px 16px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '8px', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.2s' }}
+    >
+      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
       {s.label}
-    </span>
+    </motion.button>
   );
 };
 
@@ -50,6 +60,13 @@ export default function UserDashboard() {
   const [loyalty, setLoyalty]   = useState(null);
   const [newAddress, setNewAddress] = useState({ label: 'Maison', address: '', is_default: false });
   const [addingAddr, setAddingAddr] = useState(false);
+  const [complaints, setComplaints] = useState([]);
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
+  const [complaintForm, setComplaintForm] = useState({ subject: '', description: '', order_id: '', target: 'site', restaurant_id: '', driver_id: '' });
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [editingComplaint, setEditingComplaint] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const socketRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
@@ -60,6 +77,25 @@ export default function UserDashboard() {
     fetchFavorites();
     fetchAddresses();
     fetchNotifications();
+    fetchComplaints();
+
+    // Socket.io for real time updates
+    socketRef.current = io('http://localhost:5000');
+    
+    // Listen to order status updates and refresh orders
+    socketRef.current.on('orderStatusUpdate', () => {
+      fetchOrders();
+      fetchNotifications();
+    });
+
+    // Listen to new notifications
+    socketRef.current.on('newNotification', () => {
+      fetchNotifications();
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
   const headers = { Authorization: `Bearer ${token}` };
@@ -69,6 +105,11 @@ export default function UserDashboard() {
       const { data } = await axios.get(`${API}/auth/me`, { headers });
       setUser(data);
       setProfile({ name: data.name || '', phone: data.phone || '', address: data.address || '' });
+      
+      // Join user's socket room after getting user data
+      if (socketRef.current && data) {
+        socketRef.current.emit('joinUser', data.id);
+      }
     } catch { navigate('/login'); }
   };
 
@@ -146,7 +187,8 @@ export default function UserDashboard() {
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
 
-  const handleReorder = async (orderId) => {
+  const handleReorder = async (e, orderId) => {
+    e.stopPropagation();
     try {
       const { data } = await axios.post(`${API}/orders/${orderId}/reorder`, {}, { headers });
       // Store reorder data and navigate to menu
@@ -157,9 +199,98 @@ export default function UserDashboard() {
     }
   };
 
-  const handleRemoveFavoriteRestaurant = async (restaurantId) => {
+   const handleRemoveFavoriteRestaurant = async (restaurantId) => {
     await axios.post(`${API}/favorites/restaurant/${restaurantId}`, {}, { headers });
     fetchFavorites();
+  };
+
+  const handleRemoveFavoriteItem = async (itemId) => {
+    await axios.post(`${API}/favorites/item/${itemId}`, {}, { headers });
+    fetchFavorites();
+  };
+
+  const fetchComplaints = async () => {
+    try {
+      const { data } = await axios.get(`${API}/complaints/my`, { headers });
+      setComplaints(data);
+    } catch { setComplaints([]); }
+  };
+
+  const handleSubmitComplaint = async (e) => {
+    e.preventDefault();
+    if (!complaintForm.subject || !complaintForm.description) {
+      alert('Veuillez remplir le sujet et la description');
+      return;
+    }
+    setSubmittingComplaint(true);
+    const payload = {
+      ...complaintForm,
+      restaurant_id: complaintForm.target === 'restaurant' && selectedOrder ? selectedOrder.restaurant_id : null,
+      driver_id: complaintForm.target === 'driver' && selectedOrder ? selectedOrder.driver_id : null,
+    };
+    try {
+      if (editingComplaint) {
+        await axios.put(`${API}/complaints/${editingComplaint.id}`, payload, { headers });
+      } else {
+        await axios.post(`${API}/complaints`, payload, { headers });
+      }
+      setComplaintForm({ subject: '', description: '', order_id: '', target: 'site', restaurant_id: '', driver_id: '' });
+      setShowComplaintForm(false);
+      setEditingComplaint(null);
+      setSelectedOrder(null);
+      fetchComplaints();
+      // Show success notification
+      setNotifications(prev => [{
+        id: Date.now(),
+        title: editingComplaint ? 'Réclamation modifiée' : 'Réclamation envoyée',
+        message: editingComplaint ? 'Votre réclamation a été modifiée avec succès' : 'Votre réclamation a été envoyée avec succès',
+        type: 'promo',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }, ...prev]);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erreur lors de l\'envoi');
+    }
+    setSubmittingComplaint(false);
+  };
+
+  const handleEditComplaint = (complaint) => {
+    setComplaintForm({
+      subject: complaint.subject,
+      description: complaint.description,
+      order_id: complaint.order_id || '',
+      target: complaint.target || 'site',
+      restaurant_id: complaint.restaurant_id || '',
+      driver_id: complaint.driver_id || ''
+    });
+    const order = orders.find(o => o.id === complaint.order_id);
+    setSelectedOrder(order || null);
+    setEditingComplaint(complaint);
+    setShowComplaintForm(true);
+  };
+
+  const handleDeleteComplaint = async (id) => {
+    try {
+      await axios.delete(`${API}/complaints/${id}`, { headers });
+      fetchComplaints();
+      setNotifications(prev => [{
+        id: Date.now(),
+        title: 'Réclamation supprimée',
+        message: 'Votre réclamation a été supprimée',
+        type: 'promo',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }, ...prev]);
+    } catch (err) {
+      setNotifications(prev => [{
+        id: Date.now(),
+        title: 'Erreur',
+        message: err.response?.data?.error || 'Erreur lors de la suppression',
+        type: 'promo',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }, ...prev]);
+    }
   };
 
   const handleLogout = () => {
@@ -177,13 +308,15 @@ export default function UserDashboard() {
 
   const deliveredCount = orders.filter(o => o.status === 'delivered').length;
   const totalSpent     = orders.filter(o => o.status === 'delivered').reduce((s, o) => s + Number(o.total_price), 0);
-  const pendingCount   = orders.filter(o => ['pending','preparing','on_the_way'].includes(o.status)).length;
+  const activeStatuses = ['pending','accepted','preparing','ready','searching_driver','driver_assigned','driver_at_restaurant','on_the_way'];
+  const pendingCount   = orders.filter(o => activeStatuses.includes(o.status)).length;
   const unreadNotifs   = notifications.filter(n => !n.is_read).length;
 
   const TABS = [
     { id: 'orders',        label: 'Mes commandes',   icon: <ShoppingBag size={17} /> },
     { id: 'favorites',     label: 'Favoris',          icon: <Heart size={17} /> },
     { id: 'addresses',     label: 'Adresses',         icon: <MapPin size={17} /> },
+    { id: 'complaints',    label: 'Réclamations',     icon: <AlertCircle size={17} /> },
     { id: 'notifications', label: 'Notifications',    icon: <Bell size={17} />, badge: unreadNotifs },
     { id: 'profile',       label: 'Mon profil',       icon: <Settings size={17} /> },
   ];
@@ -267,12 +400,17 @@ export default function UserDashboard() {
             {/* ORDERS TAB */}
             {tab === 'orders' && (
               <motion.div key="orders" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#111' }}>Mes commandes</h2>
-                  <span style={{ background: '#fff', padding: '6px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '700', color: '#888', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    {orders.length} commande{orders.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#111' }}>Mes commandes</h2>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <button onClick={fetchOrders} style={{ background: '#fff', padding: '6px 12px', borderRadius: '999px', fontSize: '13px', fontWeight: '700', color: '#555', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <RefreshCw size={14} /> Actualiser
+                            </button>
+                            <span style={{ background: '#fff', padding: '6px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: '700', color: '#888', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                              {orders.length} commande{orders.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
 
                 {loadingOrders ? (
                   <div style={{ background: '#fff', borderRadius: '20px', padding: '60px', textAlign: 'center' }}>
@@ -291,7 +429,8 @@ export default function UserDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {orders.map((order, i) => (
                       <motion.div key={order.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                        style={{ background: '#fff', borderRadius: '20px', padding: '22px 26px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #f5f5f5' }}>
+                        onClick={() => navigate(`/order/${order.id}`)}
+                        style={{ background: '#fff', borderRadius: '20px', padding: '22px 26px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid #f5f5f5', cursor: 'pointer' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                             {order.restaurant_image
@@ -319,17 +458,40 @@ export default function UserDashboard() {
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                             <StatusBadge status={order.status} />
+                            {/* Payment badge */}
+                            <motion.button
+                              whileHover={{ scale: 1.05, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                              whileTap={{ scale: 0.97 }}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                background: order.payment_status === 'paid' ? '#f0fdf4' : '#fff7ed',
+                                color: order.payment_status === 'paid' ? '#15803d' : '#c2410c',
+                                padding: '6px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+                              }}
+                            >
+                              {order.payment_status === 'paid' ? '✔ Payé' : '⏳ À payer à la livraison'}
+                              {order.payment_method === 'card' && <span style={{ opacity: 0.7 }}> · Carte</span>}
+                              {order.payment_method === 'cash' && <span style={{ opacity: 0.7 }}> · Cash</span>}
+                            </motion.button>
                             <span style={{ fontWeight: '900', fontSize: '17px', color: '#111' }}>{Number(order.total_price).toFixed(2)} MAD</span>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              {['on_the_way', 'preparing', 'pending'].includes(order.status) && (
-                                <Link to={`/order/${order.id}`} style={{ background: '#eff6ff', color: '#1d4ed8', padding: '6px 12px', borderRadius: '8px', textDecoration: 'none', fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <Eye size={13} /> Suivre
+                              {/* Tracking link for all active orders */}
+                            {['pending','accepted','preparing','ready','searching_driver','driver_assigned','driver_at_restaurant','on_the_way'].includes(order.status) && (
+                              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
+                                <Link to={`/order/${order.id}`} style={{ background: '#eff6ff', color: '#1d4ed8', padding: '7px 14px', borderRadius: '10px', textDecoration: 'none', fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                  <Eye size={14} /> Suivre
                                 </Link>
-                              )}
+                              </motion.div>
+                            )}
                               {order.status === 'delivered' && (
-                                <button onClick={() => handleReorder(order.id)} style={{ background: '#fff0f0', color: '#A51C1C', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <RefreshCw size={13} /> Recommander
-                                </button>
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.97 }}
+                                  onClick={(e) => handleReorder(e, order.id)}
+                                  style={{ background: '#fff0f0', color: '#A51C1C', border: 'none', padding: '7px 14px', borderRadius: '10px', fontWeight: '700', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+                                >
+                                  <RefreshCw size={14} /> Recommander
+                                </motion.button>
                               )}
                             </div>
                           </div>
@@ -359,16 +521,48 @@ export default function UserDashboard() {
                     {favorites.restaurants.length > 0 && (
                       <>
                         <h3 style={{ margin: '0 0 16px', fontWeight: '800', color: '#555', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Restaurants</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px', marginBottom: '28px' }}>
                           {favorites.restaurants.map(r => (
                             <div key={r.id} style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
-                              {r.image_url && <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />}
+                              {r.image_url ? (
+                                <img src={r.image_url} alt={r.name} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: '100%', height: '120px', background: 'linear-gradient(135deg,#fff0f0,#fce7e7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏪</div>
+                              )}
                               <div style={{ padding: '14px' }}>
-                                <p style={{ margin: 0, fontWeight: '800', color: '#111' }}>{r.name}</p>
-                                <p style={{ margin: '3px 0 10px', color: '#888', fontSize: '12px' }}>{r.cuisine}</p>
+                                <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '14px' }}>{r.name}</p>
+                                <p style={{ margin: '3px 0 12px', color: '#888', fontSize: '12px' }}>{r.cuisine}</p>
                                 <div style={{ display: 'flex', gap: '6px' }}>
-                                  <Link to="/menu" style={{ flex: 1, background: '#A51C1C', color: '#fff', padding: '8px', borderRadius: '8px', textDecoration: 'none', fontWeight: '700', fontSize: '12px', textAlign: 'center' }}>Commander</Link>
+                                  <Link to={`/menu?source=db&restaurant=${r.id}&name=${encodeURIComponent(r.name)}`} style={{ flex: 1, background: '#A51C1C', color: '#fff', padding: '8px', borderRadius: '8px', textDecoration: 'none', fontWeight: '700', fontSize: '12px', textAlign: 'center' }}>Commander</Link>
                                   <button onClick={() => handleRemoveFavoriteRestaurant(r.id)} style={{ background: '#fef2f2', color: '#b91c1c', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {favorites.items.length > 0 && (
+                      <>
+                        <h3 style={{ margin: '0 0 16px', fontWeight: '800', color: '#555', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Plats / Repas</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
+                          {favorites.items.map(item => (
+                            <div key={item.id} style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+                              {item.image_url ? (
+                                <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '120px', objectFit: 'cover' }} />
+                              ) : (
+                                <div style={{ width: '100%', height: '120px', background: 'linear-gradient(135deg,#fff0f0,#fce7e7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🍔</div>
+                              )}
+                              <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '14px' }}>{item.name}</p>
+                                <p style={{ margin: '3px 0 2px', color: '#888', fontSize: '11px' }}>Chez {item.restaurant_name}</p>
+                                <p style={{ margin: '0 0 12px', fontWeight: '900', color: '#A51C1C', fontSize: '14px' }}>{Number(item.price).toFixed(2)} MAD</p>
+                                <div style={{ display: 'flex', gap: '6px', marginTop: 'auto' }}>
+                                  <Link to={`/menu?source=db&restaurant=${item.restaurant_id}&name=${encodeURIComponent(item.restaurant_name)}`} style={{ flex: 1, background: '#111', color: '#fff', padding: '8px', borderRadius: '8px', textDecoration: 'none', fontWeight: '700', fontSize: '12px', textAlign: 'center' }}>Aller au Resto</Link>
+                                  <button onClick={() => handleRemoveFavoriteItem(item.id)} style={{ background: '#fef2f2', color: '#b91c1c', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                                     <Trash2 size={14} />
                                   </button>
                                 </div>
@@ -459,6 +653,188 @@ export default function UserDashboard() {
                             <Trash2 size={14} />
                           </button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* COMPLAINTS TAB */}
+            {tab === 'complaints' && (
+              <motion.div key="complaints" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#111' }}>Réclamations</h2>
+                  <button onClick={() => setShowComplaintForm(!showComplaintForm)} style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '999px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <Send size={15} /> Nouvelle réclamation
+                  </button>
+                </div>
+
+                {showComplaintForm && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    style={{ background: '#fff', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)', marginBottom: '20px' }}>
+                    <h3 style={{ margin: '0 0 16px', fontWeight: '800', color: '#111', fontSize: '16px' }}>{editingComplaint ? 'Modifier la réclamation' : 'Envoyer une réclamation'}</h3>
+                    <form onSubmit={handleSubmitComplaint} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '6px', display: 'block' }}>Commande concernée (optionnel)</label>
+                        <select style={inputStyle} value={complaintForm.order_id} onChange={e => {
+                          const orderId = e.target.value;
+                          const order = orders.find(o => o.id === parseInt(orderId));
+                          setSelectedOrder(order || null);
+                          setComplaintForm(prev => ({
+                            ...prev,
+                            order_id: orderId,
+                            restaurant_id: order ? order.restaurant_id : '',
+                            driver_id: order ? order.driver_id : ''
+                          }));
+                        }}>
+                          <option value="">Sélectionner une commande</option>
+                          {orders.filter(o => o.status === 'delivered').map(o => (
+                            <option key={o.id} value={o.id}>Commande #{o.id} - {o.restaurant_name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '6px', display: 'block' }}>Type de réclamation *</label>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          {[
+                            { value: 'restaurant', label: 'Restaurant', icon: <Store size={16} /> },
+                            { value: 'driver', label: 'Livreur', icon: <Bike size={16} /> },
+                            { value: 'site', label: 'Site Web', icon: <Globe size={16} /> }
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setComplaintForm({ ...complaintForm, target: opt.value })}
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '12px',
+                                borderRadius: '12px',
+                                border: complaintForm.target === opt.value ? '2px solid #A51C1C' : '1.5px solid #e5e7eb',
+                                background: complaintForm.target === opt.value ? '#fff0f0' : '#fafafa',
+                                color: complaintForm.target === opt.value ? '#A51C1C' : '#555',
+                                fontWeight: '700',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {opt.icon} {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        {complaintForm.target !== 'site' && !selectedOrder && (
+                          <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>
+                            💡 Conseil: Sélectionnez une commande concernée pour lier précisément cette réclamation.
+                          </p>
+                        )}
+                      </div>
+
+                      {selectedOrder && (
+                        <div style={{ background: '#f9f9f9', borderRadius: '12px', padding: '16px', border: '1px solid #e5e7eb' }}>
+                          <p style={{ margin: '0 0 10px', fontWeight: '800', color: '#111', fontSize: '14px' }}>Détails de la commande</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                            <div><span style={{ color: '#888', fontWeight: '600' }}>Restaurant:</span> {selectedOrder.restaurant_name}</div>
+                            <div><span style={{ color: '#888', fontWeight: '600' }}>Total:</span> {Number(selectedOrder.total_price).toFixed(2)} MAD</div>
+                            <div><span style={{ color: '#888', fontWeight: '600' }}>Date:</span> {new Date(selectedOrder.created_at).toLocaleDateString('fr-FR')}</div>
+                            {selectedOrder.delivery_name && <div><span style={{ color: '#888', fontWeight: '600' }}>Livreur:</span> {selectedOrder.delivery_name}</div>}
+                          </div>
+                          {selectedOrder.items && selectedOrder.items.length > 0 && (
+                            <div style={{ marginTop: '10px' }}>
+                              <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: '700', color: '#888' }}>Articles:</p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {selectedOrder.items.slice(0, 5).map((item, idx) => (
+                                  <span key={idx} style={{ background: '#fff', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', color: '#666', border: '1px solid #e5e7eb' }}>
+                                    {item.quantity}× {item.item_name}
+                                  </span>
+                                ))}
+                                {selectedOrder.items.length > 5 && <span style={{ fontSize: '11px', color: '#888' }}>+{selectedOrder.items.length - 5} autres</span>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '6px', display: 'block' }}>Sujet *</label>
+                        <input style={inputStyle} placeholder="Ex: Problème avec la livraison" required value={complaintForm.subject}
+                          onChange={e => setComplaintForm({ ...complaintForm, subject: e.target.value })}
+                          onFocus={e => e.target.style.borderColor = '#A51C1C'}
+                          onBlur={e => e.target.style.borderColor = '#e5e7eb'} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#888', marginBottom: '6px', display: 'block' }}>Description *</label>
+                        <textarea style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }} placeholder="Décrivez votre problème en détail..." required value={complaintForm.description}
+                          onChange={e => setComplaintForm({ ...complaintForm, description: e.target.value })}
+                          onFocus={e => e.target.style.borderColor = '#A51C1C'}
+                          onBlur={e => e.target.style.borderColor = '#e5e7eb'} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button type="submit" disabled={submittingComplaint} style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: '800', cursor: submittingComplaint ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {submittingComplaint ? (editingComplaint ? 'Modification...' : 'Envoi...') : <><Send size={14} /> {editingComplaint ? 'Modifier' : 'Envoyer'}</>}
+                        </button>
+                        <button type="button" onClick={() => { setShowComplaintForm(false); setEditingComplaint(null); setComplaintForm({ subject: '', description: '', order_id: '', target: 'site', restaurant_id: '', driver_id: '' }); setSelectedOrder(null); }} style={{ background: '#f5f5f5', border: 'none', padding: '12px 20px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                )}
+
+                {complaints.length === 0 ? (
+                  <div style={{ background: '#fff', borderRadius: '20px', padding: '60px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                    <AlertCircle size={40} color="#ddd" />
+                    <p style={{ color: '#aaa', marginTop: '12px' }}>Aucune réclamation</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {complaints.map(c => (
+                      <div key={c.id} style={{ background: '#fff', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', border: '1px solid #f5f5f5' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                              <span style={{
+                                background: c.target === 'restaurant' ? '#fff0f0' : c.target === 'driver' ? '#eff6ff' : '#f3f4f6',
+                                color: c.target === 'restaurant' ? '#A51C1C' : c.target === 'driver' ? '#1d4ed8' : '#4b5563',
+                                padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                              }}>
+                                {c.target === 'restaurant' ? <Store size={12} /> : c.target === 'driver' ? <Bike size={12} /> : <Globe size={12} />}
+                                {c.target === 'restaurant' ? 'Restaurant' : c.target === 'driver' ? 'Livreur' : 'Site Web'}
+                              </span>
+                              {c.restaurant_name && <span style={{ fontSize: '12px', color: '#666', fontWeight: '700' }}>({c.restaurant_name})</span>}
+                            </div>
+                            <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '15px' }}>{c.subject}</p>
+                            {c.order_id && <p style={{ margin: '3px 0 0', color: '#888', fontSize: '12px' }}>Commande #{c.order_id}</p>}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{
+                              padding: '4px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: '700',
+                              background: c.status === 'pending' ? '#fff7ed' : c.status === 'in_review' ? '#fefce8' : c.status === 'resolved' ? '#f0fdf4' : '#fef2f2',
+                              color: c.status === 'pending' ? '#c2410c' : c.status === 'in_review' ? '#a16207' : c.status === 'resolved' ? '#15803d' : '#b91c1c'
+                            }}>
+                              {c.status === 'pending' ? 'En attente' : c.status === 'in_review' ? 'En cours' : c.status === 'resolved' ? 'Résolu' : 'Rejeté'}
+                            </span>
+                            {c.status === 'pending' && (
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button onClick={() => handleEditComplaint(c)} style={{ background: '#f0fdf4', color: '#15803d', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700' }}>
+                                  <Edit3 size={12} /> Modifier
+                                </button>
+                                <button onClick={() => handleDeleteComplaint(c.id)} style={{ background: '#fef2f2', color: '#b91c1c', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700' }}>
+                                  <Trash2 size={12} /> Supprimer
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p style={{ margin: '0 0 12px', color: '#666', fontSize: '14px', lineHeight: '1.5' }}>{c.description}</p>
+                        <p style={{ margin: 0, color: '#bbb', fontSize: '11px' }}>
+                          {new Date(c.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
                     ))}
                   </div>

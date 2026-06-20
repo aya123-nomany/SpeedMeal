@@ -1,10 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Utensils, Users, Star, MapPin, CheckCircle, Heart, Zap, Shield, Target, Search, ArrowRight, ShoppingBag, Bike } from 'lucide-react';
+import axios from 'axios';
 import SectionTitle from '../components/SectionTitle';
 import logoUrl from "../assets/logo.png";
 import appPromoImg from "../assets/4.jpeg";
 import phoneImg from "../assets/1.jpeg";
+import { useLanguage } from "../context/LanguageContext";
 
 const StatItem = ({ label, value, icon: Icon }) => (
   <motion.div
@@ -70,14 +72,23 @@ const FeatureItem = ({ icon: Icon, title, description, highlights }) => {
 };
 
 const About = () => {
+  const [stats, setStats] = React.useState({ totalRestaurants: 0, totalCities: 0, totalDeliveries: 0, totalOrders: 0 });
+  const { t } = useLanguage();
+
+  React.useEffect(() => {
+    axios.get('http://localhost:5000/api/public-stats')
+      .then(res => setStats(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
   return (
     <div style={{ background: '#A51C1C', minHeight: '100vh', paddingBottom: '120px' }}>
       {/* Hero Section */}
       <div style={{ padding: '180px 20px 80px' }}>
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <SectionTitle 
-            title="The SpeedMeal Story"
-            subtitle="More than just delivery. We are a community of food lovers dedicated to bringing the world's best flavors to your door."
+            title={t('aboutTitle')}
+            subtitle={t('aboutSubtitle')}
             dark={true}
           />
         </div>
@@ -113,11 +124,10 @@ const About = () => {
             style={{ color: '#fff' }}
           >
             <h2 style={{ fontSize: '52px', fontWeight: '950', lineHeight: '1.05', marginBottom: '30px', letterSpacing: '-2.5px' }}>
-              Delivering happiness, <br /> one meal at a time.
+              {t('aboutHeroTitle')}
             </h2>
             <p style={{ fontSize: '19px', lineHeight: '1.8', opacity: 0.9, marginBottom: '35px' }}>
-              At SpeedMeal, we believe that great food should be accessible, reliable, and delightful. 
-              Our technology connects you with the best local kitchens, ensuring your favorites arrive fresh and fast.
+              {t('aboutHeroDesc')}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '45px' }}>
               {[
@@ -147,20 +157,20 @@ const About = () => {
           }}>
             <FeatureItem 
               icon={Utensils}
-              title="Les meilleurs restaurants de votre ville"
-              description="Avec un grand choix de restaurants, vous trouverez toujours votre plat préféré et découvrirez de nouveaux restaurants!"
-              highlights={["découvrirez de nouveaux restaurants"]}
+              title={t('feature1Title')}
+              description={t('feature1Desc')}
+              highlights={["découvrirez de nouveaux restaurants", "discover new spots"]}
             />
             <FeatureItem 
               icon={Bike}
-              title="Livraison rapide"
-              description="Notre rapidité est notre fierté. Commandez ou envoyez ce que vous voulez dans votre ville et on vous livre en quelques minutes."
-              highlights={["on vous livre en quelques minutes"]}
+              title={t('feature2Title')}
+              description={t('feature2Desc')}
+              highlights={["on vous livre en quelques minutes", "we deliver in minutes"]}
             />
             <FeatureItem 
               icon={ShoppingBag}
-              title="Vos courses et bien plus"
-              description="Trouvez tout ce qu'il vous faut ! Supermarchés, magasins, pharmacies, fleuristes... Si ça se trouve dans votre ville, commandez-le."
+              title={t('feature3Title')}
+              description={t('feature3Desc')}
               highlights={["Supermarchés, magasins, pharmacies, fleuristes..."]}
             />
           </div>
@@ -176,10 +186,10 @@ const About = () => {
           padding: '100px 0',
           marginTop: '60px'
         }}>
-          <StatItem icon={MapPin} value="23" label="Countries" />
-          <StatItem icon={Bike} value="120K" label="Monthly couriers" />
-          <StatItem icon={Utensils} value="150K" label="Monthly local stores" />
-          <StatItem icon={ShoppingBag} value="3K" label="Employees" />
+          <StatItem icon={MapPin} value={stats.totalCities !== undefined ? stats.totalCities : '0'} label={t('statCities')} />
+          <StatItem icon={Bike} value={stats.totalDeliveries !== undefined ? stats.totalDeliveries : '0'} label={t('statCouriers')} />
+          <StatItem icon={Utensils} value={stats.totalRestaurants !== undefined ? stats.totalRestaurants : '0'} label={t('statRestos')} />
+          <StatItem icon={ShoppingBag} value={stats.totalOrders !== undefined ? stats.totalOrders : '0'} label={t('statOrders')} />
         </div>
 
       </div>

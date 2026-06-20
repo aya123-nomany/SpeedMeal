@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, Flame, Pizza, Bird, Coffee, Utensils, Fish, IceCream,
@@ -9,6 +9,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import SectionTitle from '../components/SectionTitle';
 import { useCart } from '../context/CartContext';
+import { useNotification } from '../context/NotificationContext';
 import {
   searchOpenMenu, getDeals, normalizeRestaurant, normalizeMenuItem,
 } from '../services/openMenuAPI';
@@ -108,7 +109,7 @@ const RestaurantCardOM = ({ restaurant, index, onSelect }) => (
 );
 
 // ── Menu Item Card ───────────────────────────────────────────────────────────
-const MenuItemCard = ({ item, onAdd, onFavorite, isLoggedIn, source }) => {
+const MenuItemCard = ({ item, onAdd, onFavorite, isLoggedIn, source, isFavorited }) => {
   const [added, setAdded] = useState(false);
   const handleAdd = () => { onAdd(item); setAdded(true); setTimeout(() => setAdded(false), 1500); };
 
@@ -134,7 +135,7 @@ const MenuItemCard = ({ item, onAdd, onFavorite, isLoggedIn, source }) => {
         </div>
         {isLoggedIn && source !== 'openmenu' && (
           <button onClick={() => onFavorite(item.id)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', display: 'flex' }}>
-            <Heart size={16} color="#A51C1C" />
+            <Heart size={16} color="#A51C1C" fill={isFavorited ? "#A51C1C" : "none"} />
           </button>
         )}
       </div>
@@ -209,6 +210,19 @@ const DealCard = ({ deal }) => {
 const CartSidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const { cart, restaurantName, updateQuantity, removeItem, total } = useCart();
+  const { showNotification } = useNotification();
+  const token = localStorage.getItem('token');
+
+  const handleCheckout = () => {
+    if (!token) {
+      showNotification('Veuillez vous inscrire ou vous connecter pour commander !');
+      navigate('/signup');
+      return;
+    }
+    onClose();
+    navigate('/checkout');
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -252,7 +266,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
                   <span style={{ fontWeight:'900', fontSize:'15px' }}>Total</span>
                   <span style={{ fontWeight:'900', fontSize:'17px', color:'#A51C1C' }}>{total.toFixed(2)} MAD</span>
                 </div>
-                <button onClick={() => { onClose(); navigate('/checkout'); }}
+                <button onClick={handleCheckout}
                   style={{ width:'100%', background:'#A51C1C', color:'#fff', border:'none', padding:'15px', borderRadius:'14px', fontWeight:'800', fontSize:'14px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
                   Commander <ChevronRight size={17} />
                 </button>
@@ -273,9 +287,10 @@ export default function Menu() {
   const location    = useLocation();
   const token       = localStorage.getItem('token');
   const { addItem, count, total } = useCart();
+  const { showNotification } = useNotification();
 
   // State
-  const [source, setSource]                   = useState('both');   // 'both' | 'db' | 'openmenu'
+  const [source, setSource]                   = useState('db');   // 'both' | 'db' | 'openmenu'
   const [dbRestaurants, setDbRestaurants]     = useState([]);
   const [omRestaurants, setOmRestaurants]     = useState([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
@@ -292,6 +307,7 @@ export default function Menu() {
   const [omSearch, setOmSearch]               = useState('');
   const [omPage, setOmPage]                   = useState(0);
   const [omHasNext, setOmHasNext]             = useState(false);
+  const [favItemIds, setFavItemIds]           = useState([]);
 
   // On mount: check URL params (from RestaurantsSection link)
   useEffect(() => {
@@ -303,7 +319,16 @@ export default function Menu() {
       // Auto-select the OpenMenu restaurant
       handleSelectOMRestaurant({ id: rid, name: decodeURIComponent(rname || ''), source: 'openmenu' });
     }
+    fetchFavItemIds();
   }, []);
+
+  const fetchFavItemIds = async () => {
+    if (!token) return;
+    try {
+      const { data } = await axios.get(`${API}/favorites`, { headers: { Authorization: `Bearer ${token}` } });
+      setFavItemIds((data.items || []).map(i => i.id));
+    } catch {}
+  };
 
   useEffect(() => { fetchDbRestaurants(); fetchDbCategories(); }, []);
   useEffect(() => { fetchOmRestaurants(); }, [omSearch, omPage]);
@@ -375,14 +400,25 @@ export default function Menu() {
   };
 
   const handleAddToCart = (item) => {
+    if (!token) {
+      showNotification('Veuillez vous inscrire ou vous connecter pour commander !');
+      navigate('/signup');
+      return;
+    }
     if (!selectedRestaurant || selectedRestaurant.source === 'openmenu') return;
     addItem(item, selectedRestaurant.id, selectedRestaurant.name);
   };
 
   const handleFavorite = async (itemId) => {
     if (!token) { navigate('/login'); return; }
-    try { await axios.post(`${API}/favorites/item/${itemId}`, {}, { headers: { Authorization: `Bearer ${token}` } }); }
-    catch {}
+    try {
+      const { data } = await axios.post(`${API}/favorites/item/${itemId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      if (data.liked) {
+        setFavItemIds(prev => [...prev, itemId]);
+      } else {
+        setFavItemIds(prev => prev.filter(id => id !== itemId));
+      }
+    } catch {}
   };
 
   const handleBack = () => {
@@ -418,8 +454,8 @@ export default function Menu() {
           <SectionTitle
             title={selectedRestaurant ? selectedRestaurant.name : 'Nos Restaurants'}
             subtitle={selectedRestaurant
-              ? selectedRestaurant.source === 'openmenu' ? 'Via OpenMenu API' : selectedRestaurant.description || selectedRestaurant.cuisine
-              : 'SpeedMeal + données OpenMenu'}
+              ? selectedRestaurant.source === 'openmenu' ? 'Via OpenMenu API' : selectedRestaurant.cuisine
+              : ''}
             dark={true}
           />
 
@@ -461,17 +497,7 @@ export default function Menu() {
               <ArrowLeft size={15}/> Tous les restaurants
             </button>
 
-            {/* Menu / Deals tabs */}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setActiveTab('menu')}
-                style={{ padding: '10px 20px', background: activeTab === 'menu' ? '#fff' : 'rgba(255,255,255,0.12)', border: activeTab === 'menu' ? 'none' : '1px solid rgba(255,255,255,0.25)', borderRadius: '999px', cursor: 'pointer', color: activeTab === 'menu' ? '#A51C1C' : '#fff', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Utensils size={14} /> Menu
-              </button>
-              <button onClick={() => setActiveTab('deals')}
-                style={{ padding: '10px 20px', background: activeTab === 'deals' ? '#fff' : 'rgba(255,255,255,0.12)', border: activeTab === 'deals' ? 'none' : '1px solid rgba(255,255,255,0.25)', borderRadius: '999px', cursor: 'pointer', color: activeTab === 'deals' ? '#A51C1C' : '#fff', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Tag size={14} /> Deals {deals.length > 0 && `(${deals.length})`}
-              </button>
-            </div>
+
           </div>
         )}
         {/* ── MENU CATEGORY FILTER ── */}
@@ -554,6 +580,7 @@ export default function Menu() {
                   onAdd={handleAddToCart}
                   onFavorite={handleFavorite}
                   isLoggedIn={!!token}
+                  isFavorited={favItemIds.includes(item.id)}
                 />
               ))}
             </div>

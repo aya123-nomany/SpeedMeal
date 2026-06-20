@@ -3,6 +3,7 @@ const OpenAI = require('openai');
 const client = new OpenAI({
     baseURL: 'https://integrate.api.nvidia.com/v1',
     apiKey: process.env.NVIDIA_API_KEY,
+    timeout: 10000, // 10s timeout
 });
 
 /**
@@ -37,6 +38,22 @@ async function askAI(message, history = [], siteContext = null) {
             ? (orders.reduce((s, o) => s + Number(o.total_price || 0), 0) / orders.length).toFixed(2)
             : 0;
 
+        // Compute peak hour and peak day
+        const ordersByHour = new Array(24).fill(0);
+        const ordersByDay = new Array(7).fill(0);
+        const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        orders.forEach(o => {
+            const d = new Date(o.created_at);
+            if (!isNaN(d.getTime())) {
+                ordersByHour[d.getHours()]++;
+                ordersByDay[d.getDay()]++;
+            }
+        });
+        const peakHour = ordersByHour.indexOf(Math.max(...ordersByHour));
+        const peakDay = ordersByDay.indexOf(Math.max(...ordersByDay));
+        const peakHourText = ordersByHour[peakHour] > 0 ? `${peakHour}h00` : 'N/A';
+        const peakDayText = ordersByDay[peakDay] > 0 ? dayNames[peakDay] : 'N/A';
+
         const topRest = [...restaurants]
             .sort((a, b) => Number(b.rating) - Number(a.rating))
             .slice(0, 5)
@@ -61,6 +78,11 @@ async function askAI(message, history = [], siteContext = null) {
             `  • Commandes livrées: ${deliveredOrders}\n` +
             `  • Commandes annulées: ${cancelledOrders}\n` +
             `  • Valeur moyenne par commande: ${avgOrderValue} MAD\n\n` +
+            (orders.length
+                ? `📈 TENDANCES HISTORIQUES:\n` +
+                  `  - Heure de pointe (plus de commandes): ${peakHourText} (${ordersByHour[peakHour]} commandes au total)\n` +
+                  `  - Jour de pointe: ${peakDayText} (${ordersByDay[peakDay]} commandes au total)\n\n`
+                : '') +
             (topRest.length
                 ? `⭐ TOP RESTAURANTS PAR NOTE:\n${topRest.join('\n')}\n\n`
                 : '') +

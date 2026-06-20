@@ -7,6 +7,51 @@ import logoUrl from '../assets/logo.png';
 
 const API = 'http://localhost:5000/api/auth';
 
+const inp = {
+  width:'100%', padding:'14px 16px 14px 44px', borderRadius:'14px',
+  border:'1.5px solid #f0f0f0', fontSize:'15px', fontWeight:'500',
+  outline:'none', background:'#fafafa', color:'#111',
+  boxSizing:'border-box', transition:'all 0.2s',
+};
+const focus = e => { e.target.style.borderColor='#A51C1C'; e.target.style.background='#fff'; e.target.style.boxShadow='0 0 0 4px rgba(165,28,28,0.06)'; };
+const blur  = e => { e.target.style.borderColor='#f0f0f0'; e.target.style.background='#fafafa'; e.target.style.boxShadow='none'; };
+const iconStyle = { position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#bbb' };
+
+const Field = React.memo(function Field({
+  icon,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  rightEl,
+  showPass,
+  togglePass,
+}) {
+  return (
+    <div style={{ position:'relative' }}>
+      <span style={iconStyle}>{icon}</span>
+      <input
+        type={rightEl ? (showPass ? 'text' : 'password') : type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        style={{ ...inp, ...(rightEl && { paddingRight:'46px' }) }}
+        onFocus={focus}
+        onBlur={blur}
+      />
+      {rightEl && (
+        <button
+          type="button"
+          onClick={togglePass}
+          style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#aaa', display:'flex' }}
+        >
+          {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
+        </button>
+      )}
+    </div>
+  );
+});
+
 export default function Signup() {
   const [form, setForm]       = useState({ name:'', email:'', password:'', phone:'', address:'' });
   const [showPass, setShowPass] = useState(false);
@@ -19,8 +64,8 @@ export default function Signup() {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.name || !form.email || !form.password) {
-      setError('Nom, email et mot de passe sont obligatoires.');
+    if (!form.name || !form.email || !form.password || !form.phone) {
+      setError('Nom, email, mot de passe et téléphone sont obligatoires.');
       return;
     }
     setLoading(true);
@@ -38,38 +83,12 @@ export default function Signup() {
     setLoading(false);
   };
 
-  const inp = {
-    width:'100%', padding:'14px 16px 14px 44px', borderRadius:'14px',
-    border:'1.5px solid #f0f0f0', fontSize:'15px', fontWeight:'500',
-    outline:'none', background:'#fafafa', color:'#111',
-    boxSizing:'border-box', transition:'all 0.2s',
-  };
-  const focus = e => { e.target.style.borderColor='#A51C1C'; e.target.style.background='#fff'; e.target.style.boxShadow='0 0 0 4px rgba(165,28,28,0.06)'; };
-  const blur  = e => { e.target.style.borderColor='#f0f0f0'; e.target.style.background='#fafafa'; e.target.style.boxShadow='none'; };
-  const iconStyle = { position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#bbb' };
-
-  const Field = ({ icon, type='text', placeholder, k, rightEl }) => (
-    <div style={{ position:'relative' }}>
-      <span style={iconStyle}>{icon}</span>
-      <input type={rightEl ? (showPass ? 'text' : 'password') : type}
-        placeholder={placeholder} value={form[k]} onChange={set(k)}
-        style={{ ...inp, ...(rightEl && { paddingRight:'46px' }) }}
-        onFocus={focus} onBlur={blur} />
-      {rightEl && (
-        <button type="button" onClick={() => setShowPass(v => !v)}
-          style={{ position:'absolute', right:'14px', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#aaa', display:'flex' }}>
-          {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
-        </button>
-      )}
-    </div>
-  );
-
   return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', background:'#fff', position:'relative', overflow:'hidden' }}>
       <div style={{ position:'absolute', top:'-100px', right:'-100px', width:'400px', height:'400px', background:'radial-gradient(circle, rgba(165,28,28,0.04) 0%, transparent 70%)', borderRadius:'50%', zIndex:0 }} />
 
       <div style={{ padding:'30px 0 0 30px', position:'relative', zIndex:10 }}>
-        <button onClick={() => navigate(-1)} style={{ background:'#fff', border:'1px solid #eee', cursor:'pointer', padding:'12px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', boxShadow:'0 4px 12px rgba(0,0,0,0.05)' }}>
+        <button onClick={() => navigate('/')} style={{ background:'#fff', border:'1px solid #eee', cursor:'pointer', padding:'12px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', boxShadow:'0 4px 12px rgba(0,0,0,0.05)' }}>
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
       </div>
@@ -86,11 +105,11 @@ export default function Signup() {
           <p style={{ color:'#888', textAlign:'center', marginBottom:'24px', fontSize:'14px' }}>Rejoignez SpeedMeal aujourd'hui</p>
 
           <form onSubmit={handleSignup} style={{ display:'flex', flexDirection:'column', gap:'13px' }}>
-            <Field icon={<User size={16} />}  placeholder="Nom complet *" k="name" />
-            <Field icon={<Mail size={16} />}  type="email" placeholder="Email *" k="email" />
-            <Field icon={<Lock size={16} />}  placeholder="Mot de passe *" k="password" rightEl={true} />
-            <Field icon={<Phone size={16} />} type="tel" placeholder="Téléphone (optionnel)" k="phone" />
-            <Field icon={<MapPin size={16} />} placeholder="Adresse (optionnel)" k="address" />
+            <Field icon={<User size={16} />}  placeholder="Nom complet *" value={form.name} onChange={set('name')} />
+            <Field icon={<Mail size={16} />}  type="email" placeholder="Email *" value={form.email} onChange={set('email')} />
+            <Field icon={<Lock size={16} />}  placeholder="Mot de passe *" value={form.password} onChange={set('password')} rightEl={true} showPass={showPass} togglePass={() => setShowPass(v => !v)} />
+            <Field icon={<Phone size={16} />} type="tel" placeholder="Téléphone *" value={form.phone} onChange={set('phone')} />
+            <Field icon={<MapPin size={16} />} placeholder="Adresse (optionnel)" value={form.address} onChange={set('address')} />
 
             {error && (
               <div style={{ background:'#fff0f0', border:'1px solid #fca5a5', borderRadius:'12px', padding:'12px 16px', color:'#b91c1c', fontSize:'14px', fontWeight:'600' }}>

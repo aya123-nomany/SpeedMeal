@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const db = require('../config/db');
+const { createNotification } = require('./notificationRoutes');
 
 const isOwner = [authMiddleware, roleMiddleware(['restaurant', 'admin'])];
 
@@ -172,11 +173,15 @@ router.put('/:restaurantId/orders/:orderId/status', isOwner, async (req, res) =>
         const ok = await verifyOwner(req.params.restaurantId, req.user.id, req.user.role);
         if (!ok) return res.status(403).json({ message: 'Not your restaurant' });
 
-        const { status } = req.body; // 'preparing' | 'cancelled'
-        const validStatuses = ['preparing', 'cancelled'];
+        const { status } = req.body; // 'accepted' | 'preparing' | 'ready' | 'cancelled'
+        const validStatuses = ['accepted', 'preparing', 'ready', 'cancelled'];
         if (!validStatuses.includes(status)) {
-            return res.status(400).json({ message: 'Invalid status. Use: preparing or cancelled' });
+            return res.status(400).json({ message: 'Invalid status. Use: accepted, preparing, ready or cancelled' });
         }
+
+        const [[order]] = await db.execute('SELECT id, user_id FROM orders WHERE id = ? AND restaurant_id = ?',
+            [req.params.orderId, req.params.restaurantId]
+        );
 
         await db.execute('UPDATE orders SET status = ? WHERE id = ? AND restaurant_id = ?',
             [status, req.params.orderId, req.params.restaurantId]
@@ -187,6 +192,17 @@ router.put('/:restaurantId/orders/:orderId/status', isOwner, async (req, res) =>
             io.to(`order_${req.params.orderId}`).emit('orderStatusUpdate', {
                 orderId: req.params.orderId, status
             });
+        }
+
+        const statusMessages = {
+            accepted: 'Votre commande a été acceptée par le restaurant',
+            preparing: 'Votre commande est en cours de préparation',
+            ready: 'Votre commande est prête et attend un livreur',
+            cancelled: 'Votre commande a été annulée.',
+        };
+
+        if (statusMessages[status]) {
+            await createNotification(order.user_id, 'Mise à jour commande', statusMessages[status], 'order', io);
         }
 
         res.json({ message: 'Order status updated' });

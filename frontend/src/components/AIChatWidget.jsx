@@ -11,7 +11,7 @@ const SparkSVG = () => (
     style={{ position: 'absolute', top: -16, left: -18, pointerEvents: 'none' }}>
     <path d="M10 25C10 25 8 22 5 22" stroke="#FFC244" strokeWidth="4" strokeLinecap="round" />
     <path d="M12 18C12 18 10 14 8 12" stroke="#FFC244" strokeWidth="4" strokeLinecap="round" />
-    <path d="M18 14C18 14 20 10 22 8"  stroke="#FFC244" strokeWidth="4" strokeLinecap="round" />
+    <path d="M18 14C18 14 20 10 22 8" stroke="#FFC244" strokeWidth="4" strokeLinecap="round" />
   </svg>
 );
 
@@ -23,14 +23,14 @@ const SUGGESTIONS = [
 ];
 
 export default function AIChatWidget() {
-  const [open,         setOpen]        = useState(false);
-  const [chat,         setChat]        = useState([]);
-  const [input,        setInput]       = useState('');
-  const [loading,      setLoading]     = useState(false);
-  const [unread,       setUnread]      = useState(0);
-  const [siteData,     setSiteData]    = useState(null);  // restaurants + public stats
+  const [open, setOpen] = useState(false);
+  const [chat, setChat] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [siteData, setSiteData] = useState(null);  // restaurants + public stats
   const bottomRef = useRef(null);
-  const inputRef  = useRef(null);
+  const inputRef = useRef(null);
 
   const token = localStorage.getItem('token');
 
@@ -55,7 +55,7 @@ export default function AIChatWidget() {
           const restaurants = Array.isArray(r.data) ? r.data : (r.data.restaurants || []);
           setSiteData({ restaurants });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [open]);
 

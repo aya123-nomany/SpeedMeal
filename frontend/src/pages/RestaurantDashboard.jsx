@@ -7,7 +7,7 @@ import {
   Trash2, Check, X, Clock, Home, TrendingUp, Star,
   Package, ToggleLeft, ToggleRight, User, MapPin,
   Camera, ChevronRight, AlertCircle, Utensils,
-  DollarSign, Eye, EyeOff, RefreshCw
+  DollarSign, Eye, EyeOff, RefreshCw, Banknote, CreditCard, Tag, Bell
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -113,8 +113,16 @@ export default function RestaurantDashboard() {
   const [orders, setOrders]                   = useState([]);
   const [menu, setMenu]                       = useState([]);
   const [stats, setStats]                     = useState(null);
+  const [reviews, setReviews]                 = useState([]);
   const [loading, setLoading]                 = useState(false);
   const [menuLoading, setMenuLoading]         = useState(false);
+  const [coupons, setCoupons] = useState({ myCoupons: [], adminCoupons: [] });
+  const [couponForm, setCouponForm] = useState({ code: '', discount_type: 'percentage', discount_value: '', min_order: '', max_uses: '' });
+  const [couponModal, setCouponModal] = useState(false);
+  
+  // Notifications
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   // Modals
   const [itemModal, setItemModal]             = useState(false);
@@ -155,8 +163,55 @@ export default function RestaurantDashboard() {
         loadOrders(data.id);
         loadMenu(data.id);
         loadStats(data.id);
+        loadCoupons();
+        loadReviews(data.id);
+        fetchNotifications();
       }
     } catch { navigate('/login'); }
+  };
+
+  const handleCreateCoupon = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/coupons/restaurant/my`, couponForm, { headers });
+      notify('Coupon créé !');
+      setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', min_order: '', max_uses: '' });
+      setCouponModal(false);
+      loadCoupons();
+    } catch (err) {
+      notify(err.response?.data?.message || 'Erreur', false);
+    }
+  };
+
+  const handleToggleCoupon = async (id) => {
+    try {
+      await axios.put(`${API}/coupons/restaurant/toggle/${id}`, {}, { headers });
+      loadCoupons();
+      notify('Statut du coupon modifié');
+    } catch (err) {
+      notify('Erreur', false);
+    }
+  };
+
+  const handleDeleteCoupon = async (id) => {
+    if (!window.confirm('Supprimer ce coupon ?')) return;
+    try {
+      await axios.delete(`${API}/coupons/restaurant/my/${id}`, { headers });
+      loadCoupons();
+      notify('Coupon supprimé');
+    } catch (err) {
+      notify('Erreur', false);
+    }
+  };
+
+  const handleAdminCouponAccept = async (id, status) => {
+    try {
+      await axios.put(`${API}/coupons/restaurant/accept/${id}`, { status }, { headers });
+      loadCoupons();
+      notify(`Coupon ${status === 'accepted' ? 'accepté' : 'refusé'} !`);
+    } catch (err) {
+      notify('Erreur', false);
+    }
   };
 
   const loadOrders = async (id) => {
@@ -176,6 +231,45 @@ export default function RestaurantDashboard() {
   const loadStats = async (id) => {
     try { const { data } = await axios.get(`${API}/restaurant-dashboard/${id}/stats`, { headers }); setStats(data); }
     catch { setStats(null); }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await axios.get(`${API}/notifications`, { headers });
+      setNotifications(data);
+    } catch {}
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      await axios.put(`${API}/notifications/${id}/read`, {}, { headers });
+      fetchNotifications();
+    } catch {}
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await axios.put(`${API}/notifications/read-all`, {}, { headers });
+      fetchNotifications();
+    } catch {}
+  };
+
+  const loadCoupons = async () => {
+    try {
+      const { data } = await axios.get(`${API}/coupons/restaurant/my`, { headers });
+      setCoupons(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadReviews = async (id) => {
+    try {
+      const { data } = await axios.get(`${API}/reviews/restaurant/${id}`, { headers });
+      setReviews(data);
+    } catch {
+      setReviews([]);
+    }
   };
 
   const handleOrderStatus = async (orderId, status) => {
@@ -270,6 +364,8 @@ export default function RestaurantDashboard() {
     { id: 'orders', label: 'Commandes', icon: ShoppingBag },
     { id: 'menu',   label: 'Menu',      icon: Utensils },
     { id: 'stats',  label: 'Statistiques', icon: BarChart2 },
+    { id: 'coupons', label: 'Coupons', icon: Tag },
+    { id: 'reviews', label: 'Avis clients', icon: Star },
   ];
 
   return (
@@ -340,6 +436,115 @@ export default function RestaurantDashboard() {
 
       {/* ── MAIN ── */}
       <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto', minWidth: 0 }}>
+
+        {/* Header with Notifications */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 24, position: 'relative' }}>
+          <button 
+            onClick={() => setNotifOpen(!notifOpen)} 
+            style={{
+              width: 44, 
+              height: 44, 
+              borderRadius: 12, 
+              border: `1px solid ${C.border}`,
+              background: C.card,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              transition: 'all 0.15s'
+            }}
+          >
+            <Bell size={20} color={C.text} />
+            {notifications.filter(n => !n.is_read).length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: C.red
+              }} />
+            )}
+          </button>
+
+          {/* Notifications Dropdown */}
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                style={{
+                  position: 'absolute',
+                  top: 56,
+                  right: 0,
+                  width: 380,
+                  maxHeight: 450,
+                  overflowY: 'auto',
+                  background: C.card,
+                  borderRadius: 16,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                  zIndex: 1000,
+                  border: `1px solid ${C.border}`
+                }}
+              >
+                <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontWeight: 800, fontSize: 16, color: C.text }}>Notifications</h3>
+                  {notifications.filter(n => !n.is_read).length > 0 && (
+                    <button 
+                      onClick={markAllAsRead}
+                      style={{ 
+                        fontSize: 12, 
+                        fontWeight: 700, 
+                        color: C.red, 
+                        background: 'none', 
+                        border: 'none', 
+                        cursor: 'pointer' 
+                      }}
+                    >
+                      Tous lus
+                    </button>
+                  )}
+                </div>
+                
+                <div style={{ padding: 8 }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: 32, textAlign: 'center', color: C.muted }}>
+                      <p>Aucune notification</p>
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div 
+                        key={n.id}
+                        onClick={() => !n.is_read && markAsRead(n.id)}
+                        style={{
+                          padding: '14px 16px',
+                          borderRadius: 12,
+                          background: n.is_read ? 'transparent' : C.red + '08',
+                          cursor: 'pointer',
+                          marginBottom: 4,
+                          transition: 'background 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: C.text }}>{n.title}</p>
+                            <p style={{ margin: '4px 0 0', fontSize: 12, color: C.sub }}>{n.message}</p>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 11, color: C.muted, whiteSpace: 'nowrap', marginLeft: 8 }}>
+                            {new Date(n.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Feedback toast */}
         <AnimatePresence>
@@ -414,6 +619,17 @@ export default function RestaurantDashboard() {
                               <span style={{ fontWeight: 900, fontSize: 15, color: C.text }}>Commande #{order.id}</span>
                               <span style={{ fontWeight: 900, fontSize: 15, color: C.red }}>{Number(order.total_price).toFixed(2)} MAD</span>
                               <StatusBadge status={order.status} />
+                              {/* Payment status badge */}
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                background: order.payment_status === 'paid' ? '#f0fdf4' : '#fff7ed',
+                                color: order.payment_status === 'paid' ? '#15803d' : '#c2410c',
+                                padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700
+                              }}>
+                                {order.payment_status === 'paid'
+                                  ? <><Check size={11} /> Payé</>  
+                                  : <><Banknote size={11} /> {order.payment_method === 'cash' ? 'COD' : 'En attente'}</>}
+                              </span>
                               <span style={{ color: C.muted, fontSize: 11, marginLeft: 'auto' }}>
                                 {new Date(order.created_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                               </span>
@@ -431,18 +647,32 @@ export default function RestaurantDashboard() {
                             </div>
                             {order.note && <p style={{ margin: '6px 0 0', color: C.muted, fontSize: 12, fontStyle: 'italic' }}>Note: {order.note}</p>}
                           </div>
-                          {order.status === 'pending' && (
-                            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                            {order.status === 'pending' && (
+                              <>
+                                <button onClick={() => handleOrderStatus(order.id, 'accepted')}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', color: '#15803D', border: '1.5px solid #BBF7D0', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                  <Check size={14}/> Accepter
+                                </button>
+                                <button onClick={() => handleOrderStatus(order.id, 'cancelled')}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', color: '#DC2626', border: '1.5px solid #FECACA', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                  <X size={14}/> Refuser
+                                </button>
+                              </>
+                            )}
+                            {order.status === 'accepted' && (
                               <button onClick={() => handleOrderStatus(order.id, 'preparing')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', color: '#15803D', border: '1.5px solid #BBF7D0', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
-                                <Check size={14}/> Accepter
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEFCE8', color: '#A16207', border: '1.5px solid #FEF08A', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <Utensils size={14}/> Lancer préparation
                               </button>
-                              <button onClick={() => handleOrderStatus(order.id, 'cancelled')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', color: '#DC2626', border: '1.5px solid #FECACA', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
-                                <X size={14}/> Refuser
+                            )}
+                            {order.status === 'preparing' && (
+                              <button onClick={() => handleOrderStatus(order.id, 'ready')}
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EFF6FF', color: '#1D4ED8', border: '1.5px solid #BFDBFE', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <Package size={14}/> Commande prête (Recherche livreur)
                               </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     ))}
@@ -574,6 +804,147 @@ export default function RestaurantDashboard() {
               </motion.div>
             )}
 
+            {/* ══════════════ COUPONS ══════════════ */}
+            {tab === 'coupons' && (
+              <motion.div key="coupons" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <h2 style={{ margin: '0 0 20px', fontWeight: 900, fontSize: 22, color: C.text }}>Coupons & Offres</h2>
+                <div style={{ display: 'flex', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+                  <button onClick={() => { setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', min_order: '', max_uses: '' }); setCouponModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.red, color: '#fff', border: 'none', padding: '10px 18px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: 'Outfit,sans-serif', boxShadow: `0 4px 14px ${C.red}40` }}>
+                    <Plus size={15}/> Créer mon coupon
+                  </button>
+                  <button onClick={loadCoupons} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.border}`, background: C.card, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
+                    <RefreshCw size={14}/>
+                  </button>
+                </div>
+
+                {/* Admin Coupons */}
+                {coupons.adminCoupons.length > 0 && (
+                  <div style={{ marginBottom: 30 }}>
+                    <h3 style={{ margin: '0 0 14px', fontWeight: 800, fontSize: 16, color: C.text }}>Coupons de l'administration</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {coupons.adminCoupons.map(c => (
+                        <div key={c.id} style={{ background: C.card, borderRadius: 14, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', borderLeft: `4px solid ${c.acceptance_status === 'accepted' ? '#15803D' : c.acceptance_status === 'declined' ? '#DC2626' : '#F97316'}` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontWeight: 900, fontSize: 15, color: C.text }}>{c.code}</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: C.red }}>{c.discount_type === 'percentage' ? `${c.discount_value}%` : `${c.discount_value} MAD`}</span>
+                              </div>
+                              <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>
+                                Minimum: {c.min_order} MAD | {c.max_uses ? `Max ${c.max_uses} utilisations` : 'Illimité'}
+                              </p>
+                            </div>
+                            <span style={{
+                              background: c.acceptance_status === 'accepted' ? '#F0FDF4' : c.acceptance_status === 'declined' ? '#FEF2F2' : '#FFF7ED',
+                              color: c.acceptance_status === 'accepted' ? '#15803D' : c.acceptance_status === 'declined' ? '#DC2626' : '#C2410C',
+                              padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700
+                            }}>
+                              {c.acceptance_status === 'accepted' ? 'Accepté' : c.acceptance_status === 'declined' ? 'Refusé' : 'En attente'}
+                            </span>
+                          </div>
+                          {c.acceptance_status === 'pending' && (
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                              <button onClick={() => handleAdminCouponAccept(c.id, 'accepted')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', color: '#15803D', border: '1.5px solid #BBF7D0', padding: '8px 14px', borderRadius: 9, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <Check size={14}/> Accepter
+                              </button>
+                              <button onClick={() => handleAdminCouponAccept(c.id, 'declined')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FEF2F2', color: '#DC2626', border: '1.5px solid #FECACA', padding: '8px 14px', borderRadius: 9, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
+                                <X size={14}/> Refuser
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* My Coupons */}
+                <h3 style={{ margin: '0 0 14px', fontWeight: 800, fontSize: 16, color: C.text }}>Mes coupons</h3>
+                {coupons.myCoupons.length === 0 ? (
+                  <div style={{ background: C.card, borderRadius: 20, padding: '60px 40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <Tag size={48} color="#ddd" style={{ marginBottom: 12 }} />
+                    <p style={{ color: C.muted, fontWeight: 600 }}>Vous n'avez pas encore créé de coupon</p>
+                    <button onClick={() => { setCouponForm({ code: '', discount_type: 'percentage', discount_value: '', min_order: '', max_uses: '' }); setCouponModal(true); }} style={{ marginTop: 16, background: C.red, color: '#fff', border: 'none', padding: '12px 24px', borderRadius: 999, fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
+                      + Créer mon premier coupon
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+                    {coupons.myCoupons.map(c => (
+                      <motion.div key={c.id} whileHover={{ y: -2 }} style={{ background: C.card, borderRadius: 14, padding: '16px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <span style={{ display: 'block', fontWeight: 900, fontSize: 16, color: C.text }}>{c.code}</span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: C.red }}>{c.discount_type === 'percentage' ? `${c.discount_value}%` : `${c.discount_value} MAD`}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => handleToggleCoupon(c.id)} style={{ width: 30, height: 30, borderRadius: 8, background: c.is_active ? '#F0FDF4' : '#FFF7ED', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: c.is_active ? '#15803D' : '#C2410C' }}>
+                              {c.is_active ? <Eye size={14}/> : <EyeOff size={14}/>}
+                            </button>
+                            <button onClick={() => handleDeleteCoupon(c.id)} style={{ width: 30, height: 30, borderRadius: 8, background: '#FEF2F2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#DC2626' }}>
+                              <Trash2 size={14}/>
+                            </button>
+                          </div>
+                        </div>
+                        <p style={{ margin: '4px 0 0', color: C.muted, fontSize: 12 }}>
+                          Minimum: {c.min_order} MAD | Utilisés: {c.used_count}{c.max_uses ? `/${c.max_uses}` : ''}
+                        </p>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 4 }}>
+                          <span style={{ padding: '3px 8px', borderRadius: 6, background: c.is_active ? '#F0FDF4' : '#FFF7ED', color: c.is_active ? '#15803D' : '#C2410C', fontSize: 10, fontWeight: 700 }}>
+                            {c.is_active ? 'Actif' : 'Inactif'}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+              </motion.div>
+            )}
+
+            {/* ══════════════ REVIEWS ══════════════ */}
+            {tab === 'reviews' && (
+              <motion.div key="reviews" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                  <h2 style={{ margin: 0, fontWeight: 900, fontSize: 22, color: C.text }}>Avis clients <span style={{ color: C.muted, fontWeight: 600, fontSize: 16 }}>({reviews.length})</span></h2>
+                  <button onClick={() => loadReviews(restaurant.id)} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid ${C.border}`, background: C.card, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.muted }}>
+                    <RefreshCw size={14}/>
+                  </button>
+                </div>
+
+                {reviews.length === 0 ? (
+                  <div style={{ background: C.card, borderRadius: 20, padding: 60, textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <Star size={44} color="#ddd" style={{ marginBottom: 12 }} />
+                    <p style={{ color: C.muted, fontWeight: 600 }}>Aucun avis pour le moment</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+                    {reviews.map(review => (
+                      <motion.div key={review.id} whileHover={{ y: -2 }} style={{ background: C.card, borderRadius: 14, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 800, fontSize: 15, color: C.text }}>{review.user_name}</p>
+                            <p style={{ margin: '2px 0 0', color: C.muted, fontSize: 11 }}>
+                              {new Date(review.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#FFFBEB', padding: '4px 8px', borderRadius: 8 }}>
+                            <Star size={14} fill="#F59E0B" color="#F59E0B"/>
+                            <span style={{ fontWeight: 800, fontSize: 13, color: '#D97706' }}>{review.rating}/5</span>
+                          </div>
+                        </div>
+                        {review.comment ? (
+                          <p style={{ margin: 0, color: C.sub, fontSize: 13, lineHeight: 1.5 }}>"{review.comment}"</p>
+                        ) : (
+                          <p style={{ margin: 0, color: C.muted, fontSize: 13, fontStyle: 'italic' }}>Aucun commentaire laissé.</p>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
           </AnimatePresence>
         )}
       </div>
@@ -666,6 +1037,49 @@ export default function RestaurantDashboard() {
                     {savingResto ? 'Enregistrement...' : restaurant ? 'Sauvegarder' : 'Créer le restaurant'}
                   </button>
                   <button type="button" onClick={() => setInfoModal(false)} style={{ padding: '14px 20px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontFamily: 'Outfit,sans-serif', color: C.sub }}>
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══════════════ MODAL — COUPON ══════════════ */}
+      <AnimatePresence>
+        {couponModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setCouponModal(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 22, padding: '32px 36px', width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 30px 80px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: C.text }}>Créer un coupon</h3>
+                <button onClick={() => setCouponModal(false)} style={{ background: C.bg, border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={16} color={C.muted}/></button>
+              </div>
+              <form onSubmit={handleCreateCoupon} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <input style={inputStyle} placeholder="Code coupon * (ex: BIENVENUE10)" value={couponForm.code} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} required
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <select value={couponForm.discount_type} onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })}
+                    style={{ ...inputStyle, background: '#fff' }}>
+                    <option value="percentage">Pourcentage (%)</option>
+                    <option value="fixed">Montant fixe (MAD)</option>
+                  </select>
+                  <input style={inputStyle} placeholder="Valeur *" type="number" min="0" value={couponForm.discount_value} onChange={e => setCouponForm({ ...couponForm, discount_value: e.target.value })} required
+                    onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                </div>
+                <input style={inputStyle} placeholder="Commande minimum (MAD)" type="number" min="0" value={couponForm.min_order} onChange={e => setCouponForm({ ...couponForm, min_order: e.target.value })}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <input style={inputStyle} placeholder="Utilisations maximum (laisser vide pour illimité)" type="number" min="1" value={couponForm.max_uses} onChange={e => setCouponForm({ ...couponForm, max_uses: e.target.value })}
+                  onFocus={e => e.target.style.borderColor = C.red} onBlur={e => e.target.style.borderColor = C.border} />
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button type="submit" style={{ flex: 1, background: C.red, color: '#fff', border: 'none', padding: 14, borderRadius: 12, fontWeight: 800, cursor: 'pointer', fontSize: 15, fontFamily: 'Outfit,sans-serif', boxShadow: `0 6px 18px ${C.red}40` }}>
+                    Créer le coupon
+                  </button>
+                  <button type="button" onClick={() => setCouponModal(false)} style={{ padding: '14px 20px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: '#fff', cursor: 'pointer', fontWeight: 700, fontFamily: 'Outfit,sans-serif', color: C.sub }}>
                     Annuler
                   </button>
                 </div>

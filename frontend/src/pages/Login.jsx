@@ -50,7 +50,7 @@ export default function Login() {
       <div style={{ position:'absolute', bottom:'-150px', left:'-150px', width:'500px', height:'500px', background:'radial-gradient(circle, rgba(165,28,28,0.03) 0%, transparent 70%)', borderRadius:'50%', zIndex:0 }} />
 
       <div style={{ padding:'30px 0 0 30px', position:'relative', zIndex:10 }}>
-        <button onClick={() => navigate(-1)} style={{ background:'#fff', border:'1px solid #eee', cursor:'pointer', padding:'12px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', boxShadow:'0 4px 12px rgba(0,0,0,0.05)' }}>
+        <button onClick={() => navigate('/')} style={{ background:'#fff', border:'1px solid #eee', cursor:'pointer', padding:'12px', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', boxShadow:'0 4px 12px rgba(0,0,0,0.05)' }}>
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
       </div>

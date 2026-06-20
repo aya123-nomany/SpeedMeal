@@ -11,7 +11,7 @@ async function getForecast(days = 7) {
     try {
         const { data } = await axios.get(`${FORECAST_URL}/forecast`, {
             params: { days },
-            timeout: 10000,
+            timeout: 3000,
         });
         return { success: true, ...data };
     } catch (err) {
@@ -38,7 +38,7 @@ async function getRestaurantForecast(restaurantId, days = 7) {
     try {
         const { data } = await axios.get(
             `${FORECAST_URL}/forecast/restaurant/${restaurantId}`,
-            { params: { days }, timeout: 10000 }
+            { params: { days }, timeout: 3000 }
         );
         return { success: true, ...data };
     } catch (err) {

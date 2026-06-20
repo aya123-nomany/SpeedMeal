@@ -15,6 +15,13 @@ const ALLOWED_ORIGINS = [
     'http://localhost:5175',
     'http://localhost:5176',
     'http://localhost:5177',
+    'http://localhost:5178',
+    'http://192.168.1.11:5173',
+    'http://192.168.1.11:5174',
+    'http://192.168.1.11:5175',
+    'http://192.168.1.11:5176',
+    'http://192.168.1.11:5177',
+    'http://192.168.1.11:5178',
 ];
 
 const io = new Server(server, {
@@ -85,6 +92,8 @@ app.use('/api/staff',                   require('./routes/staffRoutes'));
 app.use('/api/analytics',               require('./routes/analyticsRoutes'));
 app.use('/api/promotions',              require('./routes/promotionsRoutes'));
 app.use('/api/settings',                require('./routes/settingsRoutes'));
+app.use('/api/public-stats',            require('./routes/publicStatsRoutes'));
+app.use('/api/complaints',              require('./routes/complaintRoutes'));
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
@@ -96,4 +105,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 SpeedMeal API running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`🚀 SpeedMeal API running on http://0.0.0.0:${PORT}`));

@@ -11,7 +11,7 @@ import {
   Clock, CheckCircle, XCircle, AlertCircle, Package,
   Eye, ChevronDown, Zap, Activity, Bot, Send, Sparkles,
   BarChart2, BrainCircuit, MessageSquare,
-  ClipboardList, Mail, Phone, Utensils, Bike
+  ClipboardList, Mail, Phone, Utensils, Bike, Globe
 } from 'lucide-react';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -24,6 +24,7 @@ import * as XLSX from 'xlsx';
 import logoUrl from '../assets/logo.png';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend, Filler);
+import { useLanguage } from '../context/LanguageContext';
 
 /* ── constants ── */
 const API    = 'http://localhost:5000/api/admin';
@@ -116,6 +117,7 @@ const AdminDashboard = () => {
   const navigate  = useNavigate();
   const token     = localStorage.getItem('token');
   const user      = JSON.parse(localStorage.getItem('user') || '{}');
+  const { language, t } = useLanguage();
 
   const [tab,          setTab]          = useState('overview');
   const [collapsed,    setCollapsed]    = useState(false);
@@ -126,6 +128,12 @@ const AdminDashboard = () => {
   const [coupons,      setCoupons]      = useState([]);
   const [commissions,  setCommissions]  = useState([]);
   const [reviews,      setReviews]      = useState([]);
+  const [complaints,   setComplaints]   = useState([]);
+  const [selectedComplaintOrder, setSelectedComplaintOrder] = useState(null);
+  const [selectedNotifyComplaint, setSelectedNotifyComplaint] = useState(null);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyForm, setNotifyForm] = useState({ recipientType: 'client', title: '', message: '' });
+  const [notifications, setNotifications] = useState([]);
   const [loading,      setLoading]      = useState(false);
   const [search,       setSearch]       = useState('');
   const [notifOpen,    setNotifOpen]    = useState(false);
@@ -139,6 +147,12 @@ const AdminDashboard = () => {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const chatBottomRef = useRef(null);
 
+  const [toast, setToast] = useState(null);
+  const showToast = (text, type = 'success') => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // ── Requests state ────────────────────────────────────────────────────────
   const [pendingRestaurants, setPendingRestaurants] = useState([]);
   const [pendingDelivery,    setPendingDelivery]    = useState([]);
@@ -148,6 +162,7 @@ const AdminDashboard = () => {
 
   // ── Approved drivers ──────────────────────────────────────────────────────
   const [drivers, setDrivers] = useState([]);
+  const [detailsModal, setDetailsModal] = useState(null);
 
   useEffect(() => { if (!token || user.role !== 'admin') navigate('/'); }, []);
 
@@ -159,15 +174,87 @@ const AdminDashboard = () => {
   const fetchUsers       = () => load(() => get('users'),       setUsers);
   const fetchOrders      = () => load(() => get('orders'),      setOrders);
   const fetchRestaurants = () => load(() => get('restaurants'), setRestaurants);
-  const fetchCoupons     = () => load(() => get('coupons'),     setCoupons);
+
+  const fetchCoupons     = () => load(
+    () => axios.get('http://localhost:5000/api/coupons', { headers:{ Authorization:`Bearer ${token}` } }),
+    setCoupons
+  );
+
   const fetchCommissions = () => load(() => get('commissions'), setCommissions);
   const fetchReviews     = () => load(() => get('reviews'),     setReviews);
+  
+  const fetchComplaints  = () => load(
+    () => axios.get('http://localhost:5000/api/complaints', { headers:{ Authorization:`Bearer ${token}` } }),
+    setComplaints
+  );
 
-  useEffect(() => { fetchStats(); fetchUsers(); fetchOrders(); fetchRestaurants(); }, []);
+  const updateComplaintStatus = async (id, status) => {
+    try {
+      await axios.put(`http://localhost:5000/api/complaints/${id}/status`,
+        { status },
+        { headers:{ Authorization:`Bearer ${token}` } }
+      );
+      fetchComplaints();
+    } catch (err) {
+      alert('Error updating status');
+    }
+  };
+
+  const fetchComplaintOrderDetails = async (orderId) => {
+    try {
+      const { data } = await axios.get(`http://localhost:5000/api/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSelectedComplaintOrder(data);
+    } catch (err) {
+      console.error('Error fetching order details:', err);
+    }
+  };
+
+  const handleSendNotify = async (e) => {
+    e.preventDefault();
+    if (!selectedNotifyComplaint || !notifyForm.title || !notifyForm.message) return;
+    try {
+      await axios.post(`http://localhost:5000/api/complaints/${selectedNotifyComplaint.id}/notify`,
+        notifyForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      showToast('Message envoyé avec succès', 'success');
+      setShowNotifyModal(false);
+      setNotifyForm({ recipientType: 'client', title: '', message: '' });
+      setSelectedNotifyComplaint(null);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Erreur lors de l\'envoi', 'error');
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await axios.get('http://localhost:5000/api/notifications', { headers:{ Authorization:`Bearer ${token}` } });
+      setNotifications(data);
+    } catch {}
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, { headers:{ Authorization:`Bearer ${token}` } });
+      fetchNotifications();
+    } catch {}
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await axios.put('http://localhost:5000/api/notifications/read-all', {}, { headers:{ Authorization:`Bearer ${token}` } });
+      fetchNotifications();
+    } catch {}
+  };
+
+  useEffect(() => { fetchStats(); fetchUsers(); fetchOrders(); fetchRestaurants(); fetchNotifications(); }, []);
   useEffect(() => {
     if (tab === 'coupons'     && !coupons.length)     fetchCoupons();
     if (tab === 'commissions' && !commissions.length) fetchCommissions();
     if (tab === 'reviews'     && !reviews.length)     fetchReviews();
+    if (tab === 'complaints'  && !complaints.length)  fetchComplaints();
   }, [tab]);
 
   // ── AI helpers ─────────────────────────────────────────────────────────────
@@ -344,16 +431,17 @@ const AdminDashboard = () => {
 
   /* ── nav ── */
   const NAV = [
-    { id:'overview',    label:'Dashboard',    icon:LayoutDashboard },
-    { id:'orders',      label:'Commandes',    icon:ShoppingBag },
-    { id:'users',       label:'Utilisateurs', icon:Users },
-    { id:'restaurants', label:'Restaurants',  icon:Store },
-    { id:'delivery',    label:'Livreurs',     icon:Truck },
-    { id:'commissions', label:'Commissions',  icon:DollarSign },
-    { id:'coupons',     label:'Coupons',      icon:Shield },
-    { id:'reviews',     label:'Avis',         icon:Star },
-    { id:'requests',    label:'Demandes',     icon:ClipboardList },
-    { id:'ai',          label:'IA & Forecast',icon:BrainCircuit },
+    { id:'overview',    label: t('navDashboard'),    icon:LayoutDashboard },
+    { id:'orders',      label: t('orders'),    icon:ShoppingBag },
+    { id:'users',       label: t('users'), icon:Users },
+    { id:'restaurants', label: t('restaurants'),  icon:Store },
+    { id:'delivery',    label: t('couriers'),     icon:Truck },
+    { id:'commissions', label: t('commissions'),  icon:DollarSign },
+    { id:'coupons',     label: t('coupons'),      icon:Shield },
+    { id:'reviews',     label: t('reviews'),         icon:Star },
+    { id:'complaints',  label: t('complaints'), icon:AlertCircle },
+    { id:'requests',    label: t('requests'),     icon:ClipboardList },
+    { id:'ai',          label: t('aiForecast'),icon:BrainCircuit },
   ];
 
   const filter = (arr, keys) =>
@@ -440,11 +528,11 @@ const AdminDashboard = () => {
               </div>
               <div style={{ overflow:'hidden', flex:1 }}>
                 <p style={{ margin:0, fontWeight:700, fontSize:13, color:C.text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user.name}</p>
-                <p style={{ margin:0, fontSize:11, color:C.red, fontWeight:600 }}>Administrateur</p>
+                <p style={{ margin:0, fontSize:11, color:C.red, fontWeight:600 }}>{t('admin')}</p>
               </div>
             </div>
           ) : null}
-          <button onClick={handleLogout} title="Déconnexion" style={{
+          <button onClick={handleLogout} title={t('navLogout')} style={{
             display:'flex', alignItems:'center', justifyContent: collapsed ? 'center' : 'flex-start',
             gap:8, width:'100%', padding: collapsed ? '10px' : '10px 12px',
             background:'#FEF2F2', border:'none', borderRadius:9,
@@ -455,7 +543,7 @@ const AdminDashboard = () => {
             onMouseLeave={e=>e.currentTarget.style.opacity='1'}
           >
             <LogOut size={14} strokeWidth={2.5} />
-            {!collapsed && 'Déconnexion'}
+            {!collapsed && t('navLogout')}
           </button>
         </div>
       </motion.aside>
@@ -474,7 +562,7 @@ const AdminDashboard = () => {
               {NAV.find(n=>n.id===tab)?.label}
             </h1>
             <p style={{ margin:0, fontSize:11, color:C.muted }}>
-              {new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+              {new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
             </p>
           </div>
 
@@ -482,9 +570,89 @@ const AdminDashboard = () => {
             {/* Search */}
             <div style={{ display:'flex', alignItems:'center', gap:8, background:C.bg, border:`1.5px solid ${C.border}`, borderRadius:10, padding:'8px 12px', width:200 }}>
               <Search size={13} color={C.muted} />
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher..."
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t('search')}
                 style={{ border:'none', background:'transparent', outline:'none', fontSize:12, color:C.text, fontFamily:'Outfit,sans-serif', width:'100%' }} />
               {search && <button onClick={()=>setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted, padding:0, display:'flex' }}><X size={12}/></button>}
+            </div>
+
+            {/* Notifications */}
+            <div style={{ position:'relative' }}>
+              <button onClick={() => setNotifOpen(!notifOpen)} style={{ 
+                width:36, height:36, borderRadius:9, border:`1.5px solid ${C.border}`, 
+                background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', 
+                color:C.muted, transition:'all .2s', position:'relative' 
+              }} 
+                onMouseEnter={e=>e.currentTarget.style.background=C.bg} 
+                onMouseLeave={e=>e.currentTarget.style.background='#fff'}
+              >
+                <Bell size={14} />
+                {notifications.filter(n => !n.is_read).length > 0 && (
+                  <span style={{
+                    position:'absolute', top:4, right:4, width:8, height:8,
+                    borderRadius:'50%', background:C.red
+                  }} />
+                )}
+              </button>
+
+              {/* Notifications Dropdown */}
+              <AnimatePresence>
+                {notifOpen && (
+                  <motion.div 
+                    initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-10 }}
+                    style={{
+                      position:'absolute', top:46, right:0, width:380, maxHeight:450,
+                      overflowY:'auto', background:'#fff', borderRadius:16,
+                      boxShadow:'0 8px 32px rgba(0,0,0,0.12)', zIndex:1000,
+                      border:`1px solid ${C.border}`
+                    }}
+                  >
+                    <div style={{ 
+                      padding:'16px 20px', borderBottom:`1px solid ${C.border}`, 
+                      display:'flex', justifyContent:'space-between', alignItems:'center' 
+                    }}>
+                      <h3 style={{ margin:0, fontWeight:800, fontSize:16, color:C.text }}>Notifications</h3>
+                      {notifications.filter(n => !n.is_read).length > 0 && (
+                        <button 
+                          onClick={markAllAsRead} 
+                          style={{ fontSize:12, fontWeight:700, color:C.red, background:'none', border:'none', cursor:'pointer' }}
+                        >
+                          Tous lus
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ padding:8 }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding:32, textAlign:'center', color:C.muted }}><p>Aucune notification</p></div>
+                      ) : (
+                        notifications.map(n => (
+                          <div 
+                            key={n.id} 
+                            onClick={() => !n.is_read && markAsRead(n.id)}
+                            style={{
+                              padding:'14px 16px', borderRadius:12,
+                              background:n.is_read ? 'transparent' : C.red+'08',
+                              cursor:'pointer', marginBottom:4,
+                              transition:'background .15s'
+                            }}
+                          >
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                              <div style={{ flex:1 }}>
+                                <p style={{ margin:0, fontWeight:700, fontSize:13, color:C.text }}>{n.title}</p>
+                                <p style={{ margin:'4px 0 0', fontSize:12, color:C.sub }}>{n.message}</p>
+                              </div>
+                              <p style={{ margin:0, fontSize:11, color:C.muted, whiteSpace:'nowrap', marginLeft:8 }}>
+                                {new Date(n.created_at).toLocaleDateString('fr-FR', { 
+                                  day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Refresh */}
@@ -512,14 +680,14 @@ const AdminDashboard = () => {
                 <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
                   {/* KPI row */}
-                  <SectionHeading title="Vue d'ensemble" />
+                  <SectionHeading title={t('overview')} />
                   {stats ? (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
                       {[
-                        { label:'Total menus', value:fmtK(stats.totalRestaurants*12||0), spark:ordersSparkData, color:'#8B5CF6', icon:Package, sub:'Tous les plats' },
-                        { label:'Total revenus', value:`${fmtK(stats.revenue)} MAD`, spark:revenueSparkData, color:C.red, icon:DollarSign, sub:`+${fmt(stats.todayRevenue)} aujourd'hui`, trend:'up' },
-                        { label:'Total commandes', value:stats.totalOrders, spark:ordersSparkData, color:'#3B82F6', icon:ShoppingBag, sub:`+${stats.todayOrders} aujourd'hui`, trend:'up' },
-                        { label:'Total clients', value:stats.totalUsers, spark:ordersSparkData.map((_,i)=>Math.round(ordersSparkData[i]*1.4)), color:'#22C55E', icon:Users, sub:`${stats.totalDeliveries||0} livreurs`, trend:'up' },
+                        { label: t('totalMenus'), value:fmtK(stats.totalRestaurants*12||0), spark:ordersSparkData, color:'#8B5CF6', icon:Package, sub: t('allDishes') },
+                        { label: t('totalRevenue'), value:`${fmtK(stats.revenue)} MAD`, spark:revenueSparkData, color:C.red, icon:DollarSign, sub:`+${fmt(stats.todayRevenue)} ${t('today')}`, trend:'up' },
+                        { label: t('totalOrders'), value:stats.totalOrders, spark:ordersSparkData, color:'#3B82F6', icon:ShoppingBag, sub:`+${stats.todayOrders} ${t('today')}`, trend:'up' },
+                        { label: t('totalClients'), value:stats.totalUsers, spark:ordersSparkData.map((_,i)=>Math.round(ordersSparkData[i]*1.4)), color:'#22C55E', icon:Users, sub:`${stats.totalDeliveries||0} ${t('couriers').toLowerCase()}`, trend:'up' },
                       ].map(({ label, value, spark, color, icon:Icon, sub, trend }) => (
                         <div key={label} style={{ background:'#fff', borderRadius:16, padding:'20px 22px', boxShadow:'0 2px 16px rgba(0,0,0,0.05)', display:'flex', flexDirection:'column', gap:14, position:'relative', overflow:'hidden' }}>
                           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
@@ -546,7 +714,7 @@ const AdminDashboard = () => {
                   ) : <Spin />}
 
                   {/* Charts row */}
-                  <SectionHeading title="Statistiques" />
+                  <SectionHeading title={t('statistics')} />
                   <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:16 }}>
                     {/* Revenue overview */}
                     <div style={{ background:'#fff', borderRadius:16, padding:'22px 24px', boxShadow:'0 2px 16px rgba(0,0,0,0.05)' }}>
@@ -577,7 +745,7 @@ const AdminDashboard = () => {
                   </div>
 
                   {/* Bottom row: trending items + bar chart + recent orders */}
-                  <SectionHeading title="Restaurants & Revenus" />
+                  <SectionHeading title={`${t('restaurants')} & ${t('commissions')}`} />
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:16 }}>
 
                     {/* Trending restaurants */}
@@ -768,7 +936,8 @@ const AdminDashboard = () => {
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
                     {filter(restaurants.filter(r => r.isVerified),['name','city','cuisine','owner_name']).map(r => (
                       <motion.div key={r.id} whileHover={{ y:-4, boxShadow:'0 16px 32px rgba(0,0,0,0.10)' }} transition={{ type:'spring', stiffness:300, damping:22 }}
-                        style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 16px rgba(0,0,0,0.05)' }}>
+                        onClick={() => setDetailsModal({ type: 'restaurant', data: r })}
+                        style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 16px rgba(0,0,0,0.05)', cursor: 'pointer' }}>
                         <div style={{ position:'relative' }}>
                           {r.image_url
                             ? <img src={r.image_url} alt={r.name} style={{ width:'100%', height:150, objectFit:'cover' }} />
@@ -787,8 +956,8 @@ const AdminDashboard = () => {
                             <Sparkline data={[4,5,6,5,7,8,7,9,8,10].map(v=>v+Math.random())} color="#F59E0B" />
                           </div>
                           <div style={{ display:'flex', gap:8 }}>
-                            <Btn onClick={()=>toggleResto(r.id)} variant={r.isOpen?'danger':'success'} style={{ flex:1, justifyContent:'center' }}>{r.isOpen?'Fermer':'Ouvrir'}</Btn>
-                            <Btn onClick={()=>deleteResto(r.id)} variant="danger" style={{ padding:'7px 10px' }}><Trash2 size={13}/></Btn>
+                            <Btn onClick={(e)=>{ e.stopPropagation(); toggleResto(r.id); }} variant={r.isOpen?'danger':'success'} style={{ flex:1, justifyContent:'center' }}>{r.isOpen?'Fermer':'Ouvrir'}</Btn>
+                            <Btn onClick={(e)=>{ e.stopPropagation(); deleteResto(r.id); }} variant="danger" style={{ padding:'7px 10px' }}><Trash2 size={13}/></Btn>
                           </div>
                         </div>
                       </motion.div>
@@ -835,16 +1004,26 @@ const AdminDashboard = () => {
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:16 }}>
                       {filter(drivers,['name','email','phone','address']).map(d => (
                         <motion.div key={d.id} whileHover={{ y:-3, boxShadow:'0 12px 32px rgba(0,0,0,0.10)' }} transition={{ type:'spring', stiffness:300, damping:22 }}
-                          style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 2px 16px rgba(0,0,0,0.06)', border:`1px solid ${C.border}` }}>
+                          onClick={() => setDetailsModal({ type: 'delivery', data: d })}
+                          style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 2px 16px rgba(0,0,0,0.06)', border:`1px solid ${C.border}`, cursor: 'pointer' }}>
 
                           {/* Header */}
                           <div style={{ background:'linear-gradient(135deg,#EFF6FF,#DBEAFE)', padding:'18px 20px', display:'flex', alignItems:'center', gap:14 }}>
-                            <div style={{ width:52, height:52, borderRadius:14, background:'linear-gradient(135deg,#3B82F6,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20, fontWeight:900, color:'#fff', boxShadow:'0 4px 12px rgba(59,130,246,0.35)' }}>
-                              {(d.name||'?')[0].toUpperCase()}
-                            </div>
+                            {d.face_photo ? (
+                              <img src={d.face_photo} alt={d.name} style={{ width:52, height:52, borderRadius:14, objectFit:'cover', boxShadow:'0 4px 12px rgba(0,0,0,0.15)' }} />
+                            ) : (
+                              <div style={{ width:52, height:52, borderRadius:14, background:'linear-gradient(135deg,#3B82F6,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:20, fontWeight:900, color:'#fff', boxShadow:'0 4px 12px rgba(59,130,246,0.35)' }}>
+                                {(d.name||'?')[0].toUpperCase()}
+                              </div>
+                            )}
                             <div style={{ flex:1, minWidth:0 }}>
                               <p style={{ margin:'0 0 2px', fontWeight:900, fontSize:15, color:'#1E3A8A', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.name}</p>
-                              <p style={{ margin:0, fontSize:12, color:'#3B82F6', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.email}</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: d.is_available ? '#22c55e' : '#94a3b8' }} />
+                                <span style={{ fontSize: 11, color: d.is_available ? '#16a34a' : '#64748b', fontWeight: 700 }}>
+                                  {d.is_available ? 'Disponible' : 'Indisponible'}
+                                </span>
+                              </div>
                             </div>
                             <span style={{ background: d.isActive ? '#F0FDF4' : '#FEF2F2', color: d.isActive ? '#16A34A' : '#DC2626', border:`1px solid ${d.isActive?'#BBF7D0':'#FECACA'}`, padding:'4px 10px', borderRadius:999, fontSize:11, fontWeight:800, flexShrink:0, display:'inline-flex', alignItems:'center', gap:4 }}>
                               <span style={{ width:6, height:6, borderRadius:'50%', background: d.isActive?'#16A34A':'#DC2626', display:'inline-block' }}/>
@@ -891,7 +1070,7 @@ const AdminDashboard = () => {
                             </div>
 
                             {/* Toggle active button */}
-                            <button onClick={() => put(`users/${d.id}/toggle`).then(fetchDrivers)}
+                            <button onClick={(e) => { e.stopPropagation(); put(`users/${d.id}/toggle`).then(fetchDrivers); }}
                               style={{ width:'100%', padding:'9px', borderRadius:10, border:`1.5px solid ${d.isActive?'#FECACA':'#BBF7D0'}`, background: d.isActive?'#FEF2F2':'#F0FDF4', color: d.isActive?'#DC2626':'#16A34A', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'Outfit,sans-serif', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all .18s' }}
                               onMouseEnter={e=>e.currentTarget.style.opacity='.8'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                               {d.isActive ? <><XCircle size={13}/> Désactiver</> : <><CheckCircle size={13}/> Activer</>}
@@ -910,8 +1089,8 @@ const AdminDashboard = () => {
                   <SectionHeading title="Commissions" />
                   {(() => {
                     const verifiedCommissions = commissions.filter(c => {
-                      const resto = restaurants.find(r => r.id === c.restaurant_id);
-                      return resto && resto.isVerified;
+                      // Just show all restaurants (no need to filter)
+                      return true;
                     });
                     return (
                       <>
@@ -985,7 +1164,7 @@ const AdminDashboard = () => {
                     {loading ? <Spin /> : (
                       <div style={{ overflowX:'auto' }}>
                         <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                          <thead><tr><TH>Code</TH><TH>Type</TH><TH right>Valeur</TH><TH right>Min. cmd</TH><TH right>Utilisations</TH><TH>Statut</TH><TH>Actions</TH></tr></thead>
+                          <thead><tr><TH>Code</TH><TH>Type</TH><TH right>Valeur</TH><TH right>Min. cmd</TH><TH right>Utilisations</TH><TH>Restaurants</TH><TH>Statut</TH><TH>Actions</TH></tr></thead>
                           <tbody>
                             {coupons.map(c => (
                               <tr key={c.id} onMouseEnter={e=>e.currentTarget.style.background='#FAFBFD'} onMouseLeave={e=>e.currentTarget.style.background='#fff'} style={{ transition:'background .15s' }}>
@@ -994,6 +1173,7 @@ const AdminDashboard = () => {
                                 <TD right><span style={{ fontWeight:700 }}>{c.discount_value}{c.discount_type==='percentage'?'%':' MAD'}</span></TD>
                                 <TD right style={{ color:C.sub }}>{c.min_order} MAD</TD>
                                 <TD right>{c.used_count}{c.max_uses?`/${c.max_uses}`:''}</TD>
+                                <TD style={{ color:C.sub }}>{c.accepted_restaurants}/{c.total_restaurants}</TD>
                                 <TD><Badge label={c.is_active?'Actif':'Inactif'} color={c.is_active?'#16A34A':'#DC2626'} bg={c.is_active?'#F0FDF4':'#FEF2F2'} /></TD>
                                 <TD>
                                   <div style={{ display:'flex', gap:6 }}>
@@ -1047,6 +1227,148 @@ const AdminDashboard = () => {
                     </div>
                   )}
                   </div>
+                </div>
+              )}
+
+              {/* ═══════════ COMPLAINTS ═══════════ */}
+              {tab === 'complaints' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                  <SectionHeading title="Réclamations" />
+                  <div style={{ background:'#fff', borderRadius:16, overflow:'hidden', boxShadow:'0 2px 16px rgba(0,0,0,0.05)' }}>
+                  {loading ? <Spin /> : (
+                    <div style={{ overflowX:'auto' }}>
+                      <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                        <thead><tr><TH>Client</TH><TH>Sujet</TH><TH>Description</TH><TH>Restaurant</TH><TH>Livreur</TH><TH>Statut</TH><TH>Date</TH><TH>Actions</TH></tr></thead>
+                        <tbody>
+                          {filter(complaints,['user_name','subject','description']).map(c => (
+                            <tr key={c.id} onMouseEnter={e=>e.currentTarget.style.background='#FAFBFD'} onMouseLeave={e=>e.currentTarget.style.background='#fff'} style={{ transition:'background .15s' }}>
+                              <TD>
+                                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                  <div style={{ width:30,height:30,borderRadius:8,background:C.red+'18',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:800,color:C.red,flexShrink:0 }}>{(c.user_name||'?')[0].toUpperCase()}</div>
+                                  <span style={{ fontWeight:700 }}>{c.user_name}</span>
+                                </div>
+                              </TD>
+                              <TD style={{ fontWeight:700 }}>
+                                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                                  <span style={{
+                                    background: c.target === 'restaurant' ? '#fff0f0' : c.target === 'driver' ? '#eff6ff' : '#f3f4f6',
+                                    color: c.target === 'restaurant' ? '#A51C1C' : c.target === 'driver' ? '#1d4ed8' : '#4b5563',
+                                    padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content'
+                                  }}>
+                                    {c.target === 'restaurant' ? <Store size={10} /> : c.target === 'driver' ? <Bike size={10} /> : <Globe size={10} />}
+                                    {c.target === 'restaurant' ? 'Restaurant' : c.target === 'driver' ? 'Livreur' : 'Site Web'}
+                                  </span>
+                                  {c.subject}
+                                </div>
+                              </TD>
+                              <TD style={{ color:C.sub, maxWidth:280 }}><p style={{ margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.description||'—'}</p></TD>
+                              <TD style={{ color:C.sub }}>{c.restaurant_name||'—'}</TD>
+                              <TD style={{ color:C.sub }}>{c.driver_name||'—'}</TD>
+                              <TD>
+                                <select
+                                  value={c.status}
+                                  onChange={(e)=>updateComplaintStatus(c.id, e.target.value)}
+                                  style={{
+                                    padding:'4px 8px', borderRadius:8, border:`1px solid ${C.border}`,
+                                    background:'#fff', fontWeight:700, fontSize:12, cursor:'pointer',
+                                    fontFamily:'Outfit,sans-serif'
+                                  }}
+                                >
+                                  <option value="pending">En attente</option>
+                                  <option value="in_review">En cours</option>
+                                  <option value="resolved">Résolu</option>
+                                  <option value="dismissed">Rejeté</option>
+                                </select>
+                              </TD>
+                              <TD style={{ color:C.muted, fontSize:12 }}>{new Date(c.created_at).toLocaleDateString('fr-FR')}</TD>
+                              <TD>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                  {c.order_id && (
+                                    <button
+                                      onClick={() => fetchComplaintOrderDetails(c.order_id)}
+                                      style={{ background:'#eff6ff', color:'#3b82f6', border:'none', padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:4 }}
+                                    >
+                                      <Eye size={14} /> Voir commande
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedNotifyComplaint(c);
+                                      setNotifyForm({
+                                        recipientType: 'client',
+                                        title: `Réponse à votre réclamation : ${c.subject}`,
+                                        message: ''
+                                      });
+                                      setShowNotifyModal(true);
+                                    }}
+                                    style={{ background:'#f0fdf4', color:'#16a34a', border:'none', padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:4 }}
+                                  >
+                                    <Send size={14} /> Contacter
+                                  </button>
+                                </div>
+                              </TD>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {!filter(complaints,['user_name','subject','description']).length && <p style={{ textAlign:'center', color:C.muted, padding:30 }}>Aucune réclamation</p>}
+                    </div>
+                  )}
+                  </div>
+
+                  {selectedComplaintOrder && (
+                    <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
+                      style={{ background:'#fff', borderRadius:16, padding:24, boxShadow:'0 2px 16px rgba(0,0,0,0.05)' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+                        <h3 style={{ margin:0, fontSize:18, fontWeight:800, color:C.text }}>Détails de la commande #{selectedComplaintOrder.id}</h3>
+                        <button onClick={() => setSelectedComplaintOrder(null)} style={{ background:'#f5f5f5', border:'none', padding:'8px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:700 }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:16, marginBottom:20 }}>
+                        <div style={{ background:'#f9f9f9', borderRadius:12, padding:16 }}>
+                          <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.muted }}>Restaurant</p>
+                          <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.text }}>{selectedComplaintOrder.restaurant_name}</p>
+                        </div>
+                        <div style={{ background:'#f9f9f9', borderRadius:12, padding:16 }}>
+                          <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.muted }}>Client</p>
+                          <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.text }}>{selectedComplaintOrder.user_name}</p>
+                          <p style={{ margin:'4px 0 0', fontSize:12, color:C.sub }}>{selectedComplaintOrder.user_phone}</p>
+                        </div>
+                        <div style={{ background:'#f9f9f9', borderRadius:12, padding:16 }}>
+                          <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.muted }}>Total</p>
+                          <p style={{ margin:0, fontSize:16, fontWeight:800, color:C.red }}>{fmt(selectedComplaintOrder.total_price)} MAD</p>
+                        </div>
+                        <div style={{ background:'#f9f9f9', borderRadius:12, padding:16 }}>
+                          <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.muted }}>Statut</p>
+                          <Badge label={STATUS[selectedComplaintOrder.status]?.label || selectedComplaintOrder.status} color={STATUS[selectedComplaintOrder.status]?.color} bg={STATUS[selectedComplaintOrder.status]?.bg} />
+                        </div>
+                        {selectedComplaintOrder.delivery_name && (
+                          <div style={{ background:'#f9f9f9', borderRadius:12, padding:16 }}>
+                            <p style={{ margin:'0 0 8px', fontSize:12, fontWeight:700, color:C.muted }}>Livreur</p>
+                            <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.text }}>{selectedComplaintOrder.delivery_name}</p>
+                            <p style={{ margin:'4px 0 0', fontSize:12, color:C.sub }}>{selectedComplaintOrder.delivery_phone}</p>
+                          </div>
+                        )}
+                      </div>
+                      {selectedComplaintOrder.items && selectedComplaintOrder.items.length > 0 && (
+                        <div>
+                          <p style={{ margin:'0 0 12px', fontSize:14, fontWeight:800, color:C.text }}>Articles commandés</p>
+                          <div style={{ display:'grid', gap:8 }}>
+                            {selectedComplaintOrder.items.map((item, idx) => (
+                              <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px', background:'#f9f9f9', borderRadius:8 }}>
+                                <div>
+                                  <p style={{ margin:0, fontSize:14, fontWeight:700, color:C.text }}>{item.quantity}× {item.item_name}</p>
+                                  {item.options && <p style={{ margin:'4px 0 0', fontSize:12, color:C.sub }}>{item.options}</p>}
+                                </div>
+                                <p style={{ margin:0, fontSize:14, fontWeight:800, color:C.red }}>{fmt(item.price)} MAD</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
                 </div>
               )}
 
@@ -1274,7 +1596,8 @@ const AdminDashboard = () => {
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))', gap:16 }}>
                         {pendingRestaurants.map(r => (
                           <motion.div key={r.user_id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ duration:.2 }}
-                            style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 3px 18px rgba(0,0,0,0.07)', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column' }}>
+                            onClick={() => setDetailsModal({ type: 'pending_restaurant', data: r })}
+                            style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 3px 18px rgba(0,0,0,0.07)', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', cursor: 'pointer' }}>
                             {/* Restaurant image banner */}
                             <div style={{ position:'relative', height:140, background:'linear-gradient(135deg,#FFF7ED,#FEE2D5)', overflow:'hidden', flexShrink:0 }}>
                               {r.image_url
@@ -1326,13 +1649,13 @@ const AdminDashboard = () => {
                               </div>
                               {/* Action buttons */}
                               <div style={{ display:'flex', gap:8, marginTop:'auto', paddingTop:4 }}>
-                                <button onClick={() => approveRequest('restaurants', r.user_id)}
+                                <button onClick={(e) => { e.stopPropagation(); approveRequest('restaurants', r.user_id); }}
                                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, background:'#16A34A', color:'#fff', border:'none', padding:'10px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', boxShadow:'0 3px 10px rgba(22,163,74,0.3)', transition:'all .18s' }}
                                   onMouseEnter={e=>{e.currentTarget.style.background='#15803D';e.currentTarget.style.transform='translateY(-1px)';}}
                                   onMouseLeave={e=>{e.currentTarget.style.background='#16A34A';e.currentTarget.style.transform='translateY(0)';}}>
                                   <CheckCircle size={14}/> Approuver
                                 </button>
-                                <button onClick={() => setRejectModal({ type:'restaurants', userId:r.user_id, name: r.restaurant_name || r.name })}
+                                <button onClick={(e) => { e.stopPropagation(); setRejectModal({ type:'restaurants', userId:r.user_id, name: r.restaurant_name || r.name }); }}
                                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, background:'#FEF2F2', color:'#DC2626', border:'1.5px solid #FECACA', padding:'10px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', transition:'all .18s' }}
                                   onMouseEnter={e=>e.currentTarget.style.background='#FEE2E2'}
                                   onMouseLeave={e=>e.currentTarget.style.background='#FEF2F2'}>
@@ -1359,12 +1682,17 @@ const AdminDashboard = () => {
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))', gap:16 }}>
                         {pendingDelivery.map(d => (
                           <motion.div key={d.user_id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ duration:.2 }}
-                            style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 3px 18px rgba(0,0,0,0.07)', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column' }}>
+                            onClick={() => setDetailsModal({ type: 'pending_delivery', data: d })}
+                            style={{ background:'#fff', borderRadius:18, overflow:'hidden', boxShadow:'0 3px 18px rgba(0,0,0,0.07)', border:`1px solid ${C.border}`, display:'flex', flexDirection:'column', cursor: 'pointer' }}>
                             {/* Header banner */}
                             <div style={{ background:'linear-gradient(135deg,#EFF6FF,#DBEAFE)', padding:'20px 20px 16px', display:'flex', alignItems:'center', gap:14 }}>
-                              <div style={{ width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#3B82F6,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:22, fontWeight:900, color:'#fff', boxShadow:'0 4px 14px rgba(59,130,246,0.4)' }}>
-                                {(d.name||'?')[0].toUpperCase()}
-                              </div>
+                              {d.face_photo ? (
+                                <img src={d.face_photo} alt={d.name} style={{ width:56, height:56, borderRadius:16, objectFit:'cover', boxShadow:'0 4px 12px rgba(0,0,0,0.15)' }} />
+                              ) : (
+                                <div style={{ width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#3B82F6,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:22, fontWeight:900, color:'#fff', boxShadow:'0 4px 14px rgba(59,130,246,0.4)' }}>
+                                  {(d.name||'?')[0].toUpperCase()}
+                                </div>
+                              )}
                               <div style={{ flex:1, minWidth:0 }}>
                                 <p style={{ margin:'0 0 2px', fontWeight:900, fontSize:16, color:'#1E3A8A' }}>{d.name}</p>
                                 <p style={{ margin:0, fontSize:12, color:'#3B82F6', display:'flex', alignItems:'center', gap:4 }}><MapPin size={11}/>{d.address || '—'}</p>
@@ -1404,13 +1732,13 @@ const AdminDashboard = () => {
                               </div>
                               {/* Action buttons */}
                               <div style={{ display:'flex', gap:8, marginTop:'auto', paddingTop:4 }}>
-                                <button onClick={() => approveRequest('delivery', d.user_id)}
+                                <button onClick={(e) => { e.stopPropagation(); approveRequest('delivery', d.user_id); }}
                                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, background:'#16A34A', color:'#fff', border:'none', padding:'10px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', boxShadow:'0 3px 10px rgba(22,163,74,0.3)', transition:'all .18s' }}
                                   onMouseEnter={e=>{e.currentTarget.style.background='#15803D';e.currentTarget.style.transform='translateY(-1px)';}}
                                   onMouseLeave={e=>{e.currentTarget.style.background='#16A34A';e.currentTarget.style.transform='translateY(0)';}}>
                                   <CheckCircle size={14}/> Approuver
                                 </button>
-                                <button onClick={() => setRejectModal({ type:'delivery', userId:d.user_id, name: d.name })}
+                                <button onClick={(e) => { e.stopPropagation(); setRejectModal({ type:'delivery', userId:d.user_id, name: d.name }); }}
                                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, background:'#FEF2F2', color:'#DC2626', border:'1.5px solid #FECACA', padding:'10px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', transition:'all .18s' }}
                                   onMouseEnter={e=>e.currentTarget.style.background='#FEE2E2'}
                                   onMouseLeave={e=>e.currentTarget.style.background='#FEF2F2'}>
@@ -1431,6 +1759,251 @@ const AdminDashboard = () => {
         </main>
       </div>
     </div>
+
+
+    {/* ── Details Modal — popup for restaurant/delivery details ── */}
+    {detailsModal && (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+        onClick={() => setDetailsModal(null)}>
+        <motion.div initial={{ scale:0.92, opacity:0, y:20 }} animate={{ scale:1, opacity:1, y:0 }}
+          onClick={e => e.stopPropagation()}
+          style={{ background:'#fff', borderRadius:24, width:'100%', maxWidth:540, boxShadow:'0 30px 80px rgba(0,0,0,0.25)', border:'1px solid rgba(0,0,0,0.05)', overflow:'hidden', fontFamily:'Outfit,sans-serif', maxHeight:'90vh', overflowY:'auto' }}>
+          
+          {/* Banner / Avatar Header */}
+          {['restaurant', 'pending_restaurant'].includes(detailsModal.type) ? (
+            <div style={{ height:180, position:'relative', background:'linear-gradient(135deg,#A51C1C,#7a1010)' }}>
+              {detailsModal.data.image_url ? (
+                <img src={detailsModal.data.image_url} alt={detailsModal.data.restaurant_name || detailsModal.data.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              ) : (
+                <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <Store size={64} color="rgba(255,255,255,0.3)" />
+                </div>
+              )}
+              <button onClick={() => setDetailsModal(null)} style={{ position:'absolute', top:20, right:20, background:'rgba(0,0,0,0.4)', color:'#fff', border:'none', borderRadius:'50%', width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', backdropFilter:'blur(4px)' }}>
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ padding:'32px 32px 20px', background:'linear-gradient(135deg,#1C1C2E,#2D1B4E)', color:'#fff', position:'relative', display:'flex', alignItems:'center', gap:20 }}>
+              <button onClick={() => setDetailsModal(null)} style={{ position:'absolute', top:20, right:20, background:'rgba(255,255,255,0.1)', color:'#fff', border:'none', borderRadius:'50%', width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <X size={18} />
+              </button>
+              
+              {/* Driver Photo */}
+              {detailsModal.data.face_photo ? (
+                <img src={detailsModal.data.face_photo} alt={detailsModal.data.name} style={{ width:80, height:80, borderRadius:20, objectFit:'cover', border:'3px solid #fff', boxShadow:'0 8px 20px rgba(0,0,0,0.2)' }} />
+              ) : (
+                <div style={{ width:80, height:80, borderRadius:20, background:'linear-gradient(135deg,#3B82F6,#6366F1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, fontWeight:900, color:'#fff', border:'3px solid #fff', boxShadow:'0 8px 20px rgba(0,0,0,0.2)' }}>
+                  {(detailsModal.data.name||'?')[0].toUpperCase()}
+                </div>
+              )}
+              
+              <div>
+                <span style={{ background:'#3B82F6', color:'#fff', padding:'3px 10px', borderRadius:999, fontSize:10, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.5px', display:'inline-block', marginBottom:6 }}>
+                  Livreur
+                </span>
+                <h2 style={{ margin:0, fontSize:22, fontWeight:950 }}>{detailsModal.data.name}</h2>
+                <p style={{ margin:'4px 0 0', opacity:0.7, fontSize:13 }}>{detailsModal.data.email}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Details Body */}
+          <div style={{ padding:32 }}>
+            {['restaurant', 'pending_restaurant'].includes(detailsModal.type) ? (
+              <div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
+                  <div>
+                    <h2 style={{ margin:0, fontSize:24, fontWeight:900, color:C.text }}>{detailsModal.data.restaurant_name || detailsModal.data.name}</h2>
+                    <p style={{ margin:'4px 0 0', color:C.sub, fontSize:14, display:'flex', alignItems:'center', gap:4 }}><MapPin size={14}/> {detailsModal.data.city || '—'}</p>
+                  </div>
+                  <Badge 
+                    label={detailsModal.type === 'pending_restaurant' ? 'En attente' : detailsModal.data.isOpen ? 'Ouvert' : 'Fermé'} 
+                    color={detailsModal.type === 'pending_restaurant' ? '#f97316' : detailsModal.data.isOpen ? '#16A34A' : '#DC2626'} 
+                    bg={detailsModal.type === 'pending_restaurant' ? '#fff7ed' : detailsModal.data.isOpen ? '#F0FDF4' : '#FEF2F2'} 
+                  />
+                </div>
+
+                {detailsModal.data.cuisine && (
+                  <div style={{ marginBottom:20 }}>
+                    <span style={{ background:'#FAFBFD', border:`1.5px solid ${C.border}`, padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:700, color:C.text }}>
+                      Spécialité : {detailsModal.data.cuisine}
+                    </span>
+                  </div>
+                )}
+
+                {detailsModal.data.description && (
+                  <div style={{ background:'#f8fafc', borderRadius:14, padding:'16px 20px', marginBottom:24, border:`1px solid ${C.border}` }}>
+                    <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:6 }}>Description / Message de motivation</p>
+                    <p style={{ margin:0, fontSize:13.5, color:C.text, lineHeight:1.6, fontStyle:'italic' }}>"{detailsModal.data.description}"</p>
+                  </div>
+                )}
+
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  <h4 style={{ margin:0, fontSize:12, fontWeight:800, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:`1.5px solid ${C.border}`, paddingBottom:6 }}>Informations Responsable</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Nom du responsable</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{detailsModal.data.owner_name || detailsModal.data.name}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Ville</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{detailsModal.data.city || '—'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Adresse précise</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{detailsModal.data.address || '—'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Date d'inscription</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{new Date(detailsModal.data.created_at).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Email</span>
+                      <a href={`mailto:${detailsModal.data.email}`} style={{ fontSize:14, fontWeight:700, color:C.red, textDecoration:'none' }}>{detailsModal.data.email}</a>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Téléphone</span>
+                      <a href={`tel:${detailsModal.data.phone}`} style={{ fontSize:14, fontWeight:700, color:C.text, textDecoration:'none' }}>{detailsModal.data.phone || '—'}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
+                  <div>
+                    <p style={{ margin:0, fontSize:12, color:C.muted }}>Ville d'opération</p>
+                    <p style={{ margin:'2px 0 0', fontSize:16, fontWeight:850, color:C.text, display:'flex', alignItems:'center', gap:4 }}><MapPin size={14} color={C.red}/> {detailsModal.data.address || '—'}</p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+                    <Badge 
+                      label={detailsModal.type === 'pending_delivery' ? 'En attente' : detailsModal.data.isActive ? 'Actif' : 'Inactif'} 
+                      color={detailsModal.type === 'pending_delivery' ? '#f97316' : detailsModal.data.isActive ? '#16A34A' : '#DC2626'} 
+                      bg={detailsModal.type === 'pending_delivery' ? '#fff7ed' : detailsModal.data.isActive ? '#F0FDF4' : '#FEF2F2'} 
+                    />
+                    {detailsModal.type === 'delivery' && (
+                      <span style={{
+                        background: detailsModal.data.is_available ? '#f0fdf4' : '#f1f5f9',
+                        color: detailsModal.data.is_available ? '#15803d' : '#475569',
+                        border: `1px solid ${detailsModal.data.is_available ? '#bbf7d0' : '#cbd5e1'}`,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: detailsModal.data.is_available ? '#22c55e' : '#64748b' }} />
+                        {detailsModal.data.is_available ? 'Disponible' : 'Indisponible'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vehicule & Docs */}
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:24 }}>
+                  {detailsModal.data.vehicle_type && (
+                    <div style={{ background:'#EFF6FF', color:'#3B82F6', border:'1px solid #BFDBFE', padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
+                      <Bike size={14}/> Véhicule : {detailsModal.data.vehicle_type.toUpperCase()}
+                    </div>
+                  )}
+                  <div style={{ background: detailsModal.data.has_license==='Oui'?'#F0FDF4':'#FEF2F2', color: detailsModal.data.has_license==='Oui'?'#16A34A':'#DC2626', border:`1px solid ${detailsModal.data.has_license==='Oui'?'#BBF7D0':'#FECACA'}`, padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
+                    {detailsModal.data.has_license==='Oui' ? <CheckCircle size={14}/> : <XCircle size={14}/>} Permis de conduire
+                  </div>
+                  <div style={{ background: detailsModal.data.has_insurance==='Oui'?'#F0FDF4':'#FEF2F2', color: detailsModal.data.has_insurance==='Oui'?'#16A34A':'#DC2626', border:`1px solid ${detailsModal.data.has_insurance==='Oui'?'#BBF7D0':'#FECACA'}`, padding:'6px 14px', borderRadius:10, fontSize:12, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
+                    {detailsModal.data.has_insurance==='Oui' ? <CheckCircle size={14}/> : <XCircle size={14}/>} Assurance véhicule
+                  </div>
+                </div>
+
+                {/* Performance Stats for active drivers */}
+                {detailsModal.type === 'delivery' && (
+                  <div style={{ background:'#FAFBFD', border:`1.5px solid ${C.border}`, borderRadius:16, padding:20, marginBottom:24 }}>
+                    <p style={{ margin:0, fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:12 }}>Statistiques de Livraison</p>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, textAlign:'center' }}>
+                      <div style={{ background:'#fff', padding:'10px 14px', borderRadius:12, border:`1px solid ${C.border}` }}>
+                        <span style={{ fontSize:10, color:C.muted, display:'block' }}>Livrées</span>
+                        <span style={{ fontSize:18, fontWeight:900, color:'#3B82F6' }}>{detailsModal.data.delivered_count || 0}</span>
+                      </div>
+                      <div style={{ background:'#fff', padding:'10px 14px', borderRadius:12, border:`1px solid ${C.border}` }}>
+                        <span style={{ fontSize:10, color:C.muted, display:'block' }}>Commandes</span>
+                        <span style={{ fontSize:18, fontWeight:900, color:'#F97316' }}>{detailsModal.data.total_deliveries || 0}</span>
+                      </div>
+                      <div style={{ background:'#fff', padding:'10px 14px', borderRadius:12, border:`1px solid ${C.border}` }}>
+                        <span style={{ fontSize:10, color:C.muted, display:'block' }}>Gains</span>
+                        <span style={{ fontSize:16, fontWeight:900, color:C.red }}>{fmt(detailsModal.data.total_revenue || 0)} MAD</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
+                {/* ── Face Photo Section ── */}
+                {detailsModal.data.face_photo ? (
+                  <div style={{ marginBottom:24 }}>
+                    <h4 style={{ margin:'0 0 12px', fontSize:12, fontWeight:800, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:`1.5px solid ${C.border}`, paddingBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                      📸 Photo d'identité
+                    </h4>
+                    <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+                      <div style={{ position:'relative', flexShrink:0 }}>
+                        <img
+                          src={detailsModal.data.face_photo}
+                          alt={`Photo de ${detailsModal.data.name}`}
+                          style={{ width:120, height:140, objectFit:'cover', borderRadius:14, border:`3px solid ${C.border}`, boxShadow:'0 8px 24px rgba(0,0,0,0.12)' }}
+                        />
+                        <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', background:'#16A34A', color:'#fff', padding:'3px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:4, boxShadow:'0 2px 8px rgba(22,163,74,0.4)' }}>
+                          ✓ Photo soumise
+                        </div>
+                      </div>
+                      <div>
+                        <p style={{ margin:'0 0 6px', fontWeight:700, fontSize:13, color:C.text }}>Photo de visage</p>
+                        <p style={{ margin:0, fontSize:12, color:C.sub, lineHeight:1.6 }}>Photo soumise par le livreur lors de son inscription. Utilisez cette photo pour vérifier l'identité du candidat avant d'approuver son dossier.</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom:24, background:'#FAFBFD', borderRadius:14, padding:'16px 18px', border:`1.5px dashed ${C.border}`, display:'flex', alignItems:'center', gap:14 }}>
+                    <div style={{ width:52, height:52, borderRadius:12, background:'#F4F6FB', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span style={{ fontSize:24 }}>📷</span>
+                    </div>
+                    <div>
+                      <p style={{ margin:'0 0 2px', fontWeight:700, fontSize:13, color:C.text }}>Aucune photo soumise</p>
+                      <p style={{ margin:0, fontSize:12, color:C.muted }}>Le livreur n'a pas soumis de photo de visage lors de son inscription.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  <h4 style={{ margin:0, fontSize:12, fontWeight:800, color:C.muted, textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:`1.5px solid ${C.border}`, paddingBottom:6 }}>Dossier Livreur</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Téléphone</span>
+                      <a href={`tel:${detailsModal.data.phone}`} style={{ fontSize:14, fontWeight:700, color:C.text, textDecoration:'none' }}>{detailsModal.data.phone || '—'}</a>
+                    </div>
+                    <div>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Date d'inscription</span>
+                      <span style={{ fontSize:14, fontWeight:700, color:C.text }}>{new Date(detailsModal.data.created_at).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                    <div style={{ gridColumn:'span 2' }}>
+                      <span style={{ fontSize:11, color:C.muted, display:'block' }}>Email</span>
+                      <a href={`mailto:${detailsModal.data.email}`} style={{ fontSize:14, fontWeight:700, color:C.red, textDecoration:'none' }}>{detailsModal.data.email}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action button at bottom */}
+            <div style={{ marginTop:32, borderTop:`1px solid ${C.border}`, paddingTop:20, display:'flex', justifyContent:'flex-end' }}>
+              <button onClick={() => setDetailsModal(null)} style={{ background:C.red, color:'#fff', border:'none', padding:'10px 24px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', boxShadow:`0 4px 12px ${C.red}40` }}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    )}
 
     {/* ── Reject Modal — outside AnimatePresence ── */}
     {rejectModal && (
@@ -1468,6 +2041,129 @@ const AdminDashboard = () => {
         </div>
       </div>
     )}
+
+    {/* ── Notify Modal ── */}
+    {showNotifyModal && selectedNotifyComplaint && (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:5000, display:'flex', alignItems:'center', justifyContext:'center', padding:20, justifyContent: 'center' }}
+        onClick={() => { setShowNotifyModal(false); setSelectedNotifyComplaint(null); }}>
+        <div style={{ background:'#fff', borderRadius:20, padding:'28px 32px', maxWidth:480, width:'100%', boxShadow:'0 24px 64px rgba(0,0,0,0.2)', fontFamily:'Outfit,sans-serif' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ display:'flex', alignItems:'center', justifyContext:'space-between', justifyContent: 'space-between', marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ width:40, height:40, borderRadius:11, background:'#F0FDF4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <Send size={18} color="#16A34A"/>
+              </div>
+              <div>
+                <p style={{ margin:0, fontWeight:800, fontSize:16, color:C.text }}>Contacter les intervenants</p>
+                <p style={{ margin:'2px 0 0', fontSize:12, color:C.muted }}>Sujet : {selectedNotifyComplaint.subject}</p>
+              </div>
+            </div>
+            <button onClick={() => { setShowNotifyModal(false); setSelectedNotifyComplaint(null); }} style={{ background:'none', border:'none', cursor:'pointer', color:C.muted }}>
+              <X size={18} />
+            </button>
+          </div>
+          
+          <form onSubmit={handleSendNotify} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', display:'block', marginBottom:6 }}>Destinataire *</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {[
+                  { value: 'client', label: 'Client', enabled: true },
+                  { value: 'restaurant', label: 'Restaurant', enabled: !!selectedNotifyComplaint.restaurant_owner_id },
+                  { value: 'driver', label: 'Livreur', enabled: !!selectedNotifyComplaint.driver_id }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={!opt.enabled}
+                    onClick={() => setNotifyForm(prev => ({ ...prev, recipientType: opt.value }))}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: 10,
+                      border: notifyForm.recipientType === opt.value ? `2px solid ${C.red}` : `1px solid ${C.border}`,
+                      background: notifyForm.recipientType === opt.value ? '#FFF1EE' : opt.enabled ? '#fff' : '#f5f5f5',
+                      color: notifyForm.recipientType === opt.value ? C.red : opt.enabled ? C.text : '#ccc',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: opt.enabled ? 'pointer' : 'not-allowed',
+                      opacity: opt.enabled ? 1 : 0.6,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', display:'block', marginBottom:6 }}>Titre de la notification *</label>
+              <input
+                type="text"
+                required
+                value={notifyForm.title}
+                onChange={e => setNotifyForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Ex: Réponse à votre réclamation"
+                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:'Outfit,sans-serif', outline:'none', boxSizing:'border-box', color:C.text }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', display:'block', marginBottom:6 }}>Message *</label>
+              <textarea
+                required
+                value={notifyForm.message}
+                onChange={e => setNotifyForm(prev => ({ ...prev, message: e.target.value }))}
+                placeholder="Écrivez votre message ou résolution de la réclamation ici..."
+                rows={4}
+                style={{ width:'100%', padding:'12px 14px', borderRadius:10, border:`1.5px solid ${C.border}`, fontSize:13, fontFamily:'Outfit,sans-serif', resize:'none', outline:'none', boxSizing:'border-box', color:C.text }}
+              />
+            </div>
+
+            <div style={{ display:'flex', gap:10, marginTop:10 }}>
+              <button type="button" onClick={() => { setShowNotifyModal(false); setSelectedNotifyComplaint(null); }}
+                style={{ flex:1, padding:11, borderRadius:10, border:`1.5px solid ${C.border}`, background:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', color:C.sub }}>
+                Annuler
+              </button>
+              <button type="submit"
+                style={{ flex:1, padding:11, borderRadius:10, border:'none', background:C.red, color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'Outfit,sans-serif', boxShadow:`0 4px 12px ${C.red}35` }}>
+                Envoyer
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 20, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: '50%',
+              zIndex: 9999,
+              background: toast.type === 'error' ? '#ef4444' : '#22c55e',
+              color: 'white',
+              padding: '12px 24px',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              fontWeight: 600,
+              fontFamily: 'Outfit, sans-serif',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
+            {toast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

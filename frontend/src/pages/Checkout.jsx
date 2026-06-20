@@ -5,7 +5,8 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import {
   ShoppingBag, MapPin, CreditCard, Banknote, Tag,
-  ChevronRight, Trash2, Plus, Minus, ArrowLeft, Clock, Check, X
+  ChevronRight, Trash2, Plus, Minus, ArrowLeft, Clock, Check, X,
+  Lock, Wifi, Shield
 } from 'lucide-react';
 
 const API = 'http://localhost:5000/api';
@@ -25,12 +26,23 @@ export default function Checkout() {
   const [deliveryTime, setDeliveryTime] = useState('');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const [cardForm, setCardForm] = useState({ number: '', expiry: '', cvv: '', name: '' });
+  const [cardStep, setCardStep] = useState('form'); // 'form' | 'processing' | 'success'
+  const [userLocation, setUserLocation] = useState(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
     if (cart.length === 0) { navigate('/menu'); return; }
     fetchAddresses();
+    // Get user's location for delivery tracking
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => console.log('Geolocation permission denied'),
+        { enableHighAccuracy: true }
+      );
+    }
   }, []);
 
   const fetchAddresses = async () => {
@@ -68,10 +80,37 @@ export default function Checkout() {
   const discount = coupon ? Number(coupon.discount_amount) : 0;
   const finalTotal = Math.max(0, total - discount);
 
-  const placeOrder = async () => {
+  const placeOrder = async (isCardPaid = false) => {
     const deliveryAddress = getDeliveryAddress();
     if (!deliveryAddress) {
       setError("Veuillez saisir ou sélectionner une adresse de livraison");
+      return;
+    }
+
+    // If card payment, validate & simulate processing inline
+    if (paymentMethod === 'card' && !isCardPaid) {
+      if (!cardForm.number || cardForm.number.replace(/\s/g, '').length < 16) {
+        setError("Veuillez entrer un numéro de carte valide (16 chiffres)");
+        return;
+      }
+      if (!cardForm.name) {
+        setError("Veuillez entrer le nom du titulaire de la carte");
+        return;
+      }
+      if (!cardForm.expiry || cardForm.expiry.length < 5) {
+        setError("Veuillez entrer une date d'expiration valide (MM/AA)");
+        return;
+      }
+      if (!cardForm.cvv || cardForm.cvv.length < 3) {
+        setError("Veuillez entrer le code de sécurité CVV (3 chiffres)");
+        return;
+      }
+      setError('');
+      setCardStep('processing');
+      await new Promise(r => setTimeout(r, 2200));
+      setCardStep('success');
+      await new Promise(r => setTimeout(r, 1000));
+      placeOrder(true);
       return;
     }
 
@@ -82,7 +121,10 @@ export default function Checkout() {
         items: cart.map(i => ({ id: i.id, quantity: i.quantity, price: Number(i.price) })),
         total_price: finalTotal,
         address: deliveryAddress,
+        delivery_lat: userLocation?.lat || null,
+        delivery_lng: userLocation?.lng || null,
         payment_method: paymentMethod,
+        payment_status: paymentMethod === 'card' ? 'paid' : 'pending',
         coupon_id: coupon?.coupon_id || null,
         discount_amount: discount,
         note: note || null,
@@ -101,6 +143,11 @@ export default function Checkout() {
     setPlacing(false);
   };
 
+  const formatCardNumber = (v) => v.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})/g, '$1 ').trim();
+  const formatExpiry = (v) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length >= 3 ? d.slice(0,2) + '/' + d.slice(2) : d; };
+
+
+
   const inputStyle = {
     width: '100%', padding: '13px 16px', borderRadius: '12px',
     border: '1.5px solid #e5e7eb', fontSize: '14px', outline: 'none',
@@ -108,6 +155,7 @@ export default function Checkout() {
   };
 
   return (
+    <>
     <div style={{ minHeight: '100vh', background: '#f4f5f7', paddingBottom: '60px' }}>
       {/* Header */}
       <div style={{ background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '16px 24px', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -226,8 +274,90 @@ export default function Checkout() {
               ))}
             </div>
             {paymentMethod === 'card' && (
-              <div style={{ marginTop: '12px', padding: '12px 16px', background: '#eff6ff', borderRadius: '12px', fontSize: '13px', color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <CreditCard size={14} color="#1d4ed8"/> Le paiement par carte sera traité via Stripe de manière sécurisée.
+              <div style={{ marginTop: '18px' }}>
+                {/* Processing overlay */}
+                {cardStep === 'processing' && (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', background: '#fafafa', borderRadius: '16px', border: '2px solid #e5e7eb' }}>
+                    <div style={{ width: '56px', height: '56px', border: '5px solid #f3f3f3', borderTop: '5px solid #A51C1C', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <p style={{ margin: 0, fontWeight: '800', color: '#111', fontSize: '15px' }}>Traitement en cours...</p>
+                    <p style={{ margin: '4px 0 0', color: '#888', fontSize: '13px' }}>Veuillez patienter</p>
+                  </div>
+                )}
+                {cardStep === 'success' && (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f0fdf4', borderRadius: '16px', border: '2px solid #86efac' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg,#22c55e,#16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                      <Check size={28} color="#fff" strokeWidth={3} />
+                    </div>
+                    <p style={{ margin: 0, fontWeight: '800', color: '#15803d', fontSize: '15px' }}>Paiement accepté !</p>
+                    <p style={{ margin: '4px 0 0', color: '#15803d', fontSize: '13px' }}>Redirection vers votre commande...</p>
+                  </div>
+                )}
+                {cardStep === 'form' && (
+                  <>
+                    {/* Card Visual */}
+                    <div style={{ background: 'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)', borderRadius: '16px', padding: '22px 24px', marginBottom: '18px', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+                      <div style={{ position: 'absolute', bottom: '-30px', left: '60px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+                        <Wifi size={22} color="rgba(255,255,255,0.7)" />
+                        <span style={{ fontSize: '14px', fontWeight: '800', opacity: 0.75, letterSpacing: '1px' }}>VISA</span>
+                      </div>
+                      <p style={{ margin: '0 0 16px', fontFamily: 'monospace', fontSize: '17px', letterSpacing: '3px', fontWeight: '700' }}>
+                        {cardForm.number || '**** **** **** ****'}
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '10px', opacity: 0.55, textTransform: 'uppercase' }}>Titulaire</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: '700' }}>{cardForm.name || 'VOTRE NOM'}</p>
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '10px', opacity: 0.55, textTransform: 'uppercase' }}>Expire</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '13px', fontWeight: '700' }}>{cardForm.expiry || 'MM/AA'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Fields */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Numéro de carte</label>
+                        <input value={cardForm.number}
+                          onChange={e => setCardForm(f => ({ ...f, number: formatCardNumber(e.target.value) }))}
+                          placeholder="1234 5678 9012 3456"
+                          style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e5e7eb', fontSize: '15px', outline: 'none', fontFamily: 'monospace', boxSizing: 'border-box', letterSpacing: '2px' }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Nom du titulaire</label>
+                        <input value={cardForm.name}
+                          onChange={e => setCardForm(f => ({ ...f, name: e.target.value.toUpperCase() }))}
+                          placeholder="JEAN DUPONT"
+                          style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>Date d'expiration</label>
+                          <input value={cardForm.expiry}
+                            onChange={e => setCardForm(f => ({ ...f, expiry: formatExpiry(e.target.value) }))}
+                            placeholder="MM/AA"
+                            style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>CVV</label>
+                          <input value={cardForm.cvv}
+                            onChange={e => setCardForm(f => ({ ...f, cvv: e.target.value.replace(/\D/g,'').slice(0,3) }))}
+                            placeholder="123" type="password"
+                            style={{ width: '100%', padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '14px', padding: '10px 14px', background: '#f0fdf4', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Shield size={13} color="#15803d" />
+                      <span style={{ fontSize: '12px', color: '#15803d', fontWeight: '600' }}>Paiement 100% sécurisé — Connexion chiffrée SSL</span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -299,7 +429,7 @@ export default function Checkout() {
               </div>
             )}
 
-            <button onClick={placeOrder} disabled={placing || cart.length === 0}
+            <button onClick={() => placeOrder(false)} disabled={placing || cart.length === 0}
               style={{
                 width: '100%', marginTop: '20px', padding: '18px', borderRadius: '16px',
                 border: 'none', background: placing ? '#c97a7a' : '#A51C1C',
@@ -308,7 +438,7 @@ export default function Checkout() {
                 boxShadow: '0 8px 25px rgba(165,28,28,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
               }}>
-              {placing ? 'Traitement en cours...' : <><Check size={18} /> Confirmer la commande</>}
+              {placing ? 'Traitement en cours...' : paymentMethod === 'card' ? <><CreditCard size={18} /> Procéder au paiement</> : <><Check size={18} /> Confirmer la commande</>}
             </button>
 
             <p style={{ textAlign: 'center', color: '#aaa', fontSize: '12px', marginTop: '12px' }}>
@@ -318,5 +448,8 @@ export default function Checkout() {
         </div>
       </div>
     </div>
+
+
+    </>
   );
 }

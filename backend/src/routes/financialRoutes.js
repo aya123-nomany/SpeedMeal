@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const financialController = require('../controllers/financialController');
-const authMiddleware = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 
 // Get earnings
 router.get('/:restaurantId/earnings', authMiddleware, financialController.getEarnings);

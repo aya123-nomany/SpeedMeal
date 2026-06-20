@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Star, MapPin, Utensils, Tag, ChevronRight, Globe, Flame, Pizza, Fish, Coffee } from 'lucide-react';
+import { Star, MapPin, Utensils, Tag, ChevronRight, Flame, Pizza, Fish, Coffee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { searchOpenMenu, normalizeRestaurant } from '../services/openMenuAPI';
+import axios from 'axios';
+
+// Import sample images
+import img1 from '../assets/1.jpeg';
+import img2 from '../assets/2.jpeg';
+import img3 from '../assets/3.jpeg';
+import img4 from '../assets/4.jpeg';
+import imgBurger from '../assets/burger.png';
+import imgPizza from '../assets/pizza.png';
 
 const CUISINE_ICON = {
   american: Flame, italian: Pizza, mexican: Utensils, chinese: Utensils,
@@ -16,13 +24,23 @@ const getCuisineIcon = (cuisine = '') => {
 
 const CARD_BG = ['#fff4ee', '#f0fdf4', '#eff6ff', '#fdf4ff', '#fffbeb', '#f0f9ff'];
 
-const RestaurantCardOM = ({ restaurant, index }) => {
+// Sample restaurant data for demo
+const SAMPLE_RESTAURANTS = [
+  { id: 1, name: 'The Burger Company', description: 'Délicieux burgers frais', cuisine: 'burger', address: 'Avenue Hassan II, N°18', image_url: img1 },
+  { id: 2, name: 'Pizza Paradise', description: 'Pizzas artisanales', cuisine: 'pizza', address: 'Rue Moulay Youssef, 45', image_url: img2 },
+  { id: 3, name: 'Sushi Master', description: 'Fresh sushi and sashimi', cuisine: 'japanese', address: 'Boulevard Mohammed V, 12', image_url: img3 },
+  { id: 4, name: 'Taco Fiesta', description: 'Authentic Mexican tacos', cuisine: 'mexican', address: 'Avenue des FAR, 89', image_url: img4 },
+  { id: 5, name: 'Burger Hub', description: 'Gourmet burgers', cuisine: 'burger', address: 'Rue Ibn Sina, 34', image_url: imgBurger },
+  { id: 6, name: 'Pizza World', description: 'World-famous pizzas', cuisine: 'pizza', address: 'Boulevard Anfa, 67', image_url: imgPizza },
+];
+
+const RestaurantCard = ({ restaurant, index }) => {
   const navigate = useNavigate();
   const bg = CARD_BG[index % CARD_BG.length];
 
   return (
     <div
-      onClick={() => navigate(`/menu?restaurant=${restaurant.id}&name=${encodeURIComponent(restaurant.name)}&source=openmenu`)}
+      onClick={() => navigate(`/menu?restaurant=${restaurant.id}&name=${encodeURIComponent(restaurant.name)}`)}
       style={{
         background: '#fff',
         borderRadius: '24px',
@@ -37,7 +55,7 @@ const RestaurantCardOM = ({ restaurant, index }) => {
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)'; }}
     >
       {/* Image or emoji header */}
-      <div style={{ height: '160px', background: bg, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ height: '200px', background: bg, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {restaurant.image_url
           ? <img src={restaurant.image_url} alt={restaurant.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
           : (() => { const Icon = getCuisineIcon(restaurant.cuisine); return <Icon size={52} color="#A51C1C" style={{ opacity: 0.3 }} />; })()
@@ -53,25 +71,17 @@ const RestaurantCardOM = ({ restaurant, index }) => {
             <Tag size={11} /> {restaurant.deals_count} deal{restaurant.deals_count > 1 ? 's' : ''}
           </div>
         )}
-        <div style={{
-          position: 'absolute', top: '10px', left: '10px',
-          background: 'rgba(255,255,255,0.9)',
-          padding: '3px 10px', borderRadius: '999px',
-          fontSize: '11px', fontWeight: '700', color: '#555',
-        }}>
-          OpenMenu
-        </div>
       </div>
 
       {/* Body */}
       <div style={{ padding: '16px 20px 18px' }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: '800', color: '#111', lineHeight: 1.3 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: '800', color: '#111', lineHeight: 1.3 }}>
           {restaurant.name}
         </h3>
 
         {restaurant.description && (
           <p style={{
-            margin: '0 0 10px', color: '#888', fontSize: '13px', lineHeight: 1.5,
+            margin: '0 0 10px', color: '#888', fontSize: '14px', lineHeight: 1.5,
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>
             {restaurant.description}
@@ -94,7 +104,7 @@ const RestaurantCardOM = ({ restaurant, index }) => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
-          <span style={{ color: '#A51C1C', fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color: '#A51C1C', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             Voir le menu <ChevronRight size={14} />
           </span>
         </div>
@@ -113,11 +123,14 @@ export default function RestaurantsSection() {
     const load = async () => {
       setLoading(true);
       try {
-        // 'sample' = sandbox, no credits consumed
-        const { restaurants: raw } = await searchOpenMenu('sample');
-        setRestaurants(raw.map(normalizeRestaurant));
+        const { data } = await axios.get('http://localhost:5000/api/restaurants');
+        if (data.filter(r => r.isVerified).length > 0) {
+          setRestaurants(data.filter(r => r.isVerified));
+        } else {
+          setRestaurants(SAMPLE_RESTAURANTS);
+        }
       } catch (err) {
-        setError('Impossible de charger les restaurants.');
+        setRestaurants(SAMPLE_RESTAURANTS); // Fallback to sample data
       }
       setLoading(false);
     };
@@ -146,10 +159,6 @@ export default function RestaurantsSection() {
           <p style={{ textAlign: 'center', color: '#A51C1C', fontWeight: '600', padding: '40px' }}>{error}</p>
         )}
 
-        {!loading && !error && restaurants.length === 0 && (
-          <p style={{ textAlign: 'center', color: '#888', padding: '60px' }}>Aucun restaurant trouvé.</p>
-        )}
-
         {!loading && restaurants.length > 0 && (
           <>
             <div style={{
@@ -158,8 +167,8 @@ export default function RestaurantsSection() {
               gap: '24px',
               marginBottom: '40px',
             }}>
-              {restaurants.slice(0, 6).map((r, i) => (
-                <RestaurantCardOM key={r.id || i} restaurant={r} index={i} />
+              {restaurants.map((r, i) => (
+                <RestaurantCard key={r.id} restaurant={r} index={i} />
               ))}
             </div>
 

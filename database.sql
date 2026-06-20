@@ -238,17 +238,6 @@ INSERT IGNORE INTO coupons (code, discount_type, discount_value, min_order, max_
     ('SPEED20',   'percentage', 20, 100, 500),
     ('FLAT15',    'fixed',      15, 80,  200);
 
--- ── OTP CODES (SMS / WhatsApp auth) ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS otp_codes (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    phone VARCHAR(20) NOT NULL,
-    code VARCHAR(6) NOT NULL,
-    channel ENUM('sms', 'whatsapp') DEFAULT 'sms',
-    expires_at DATETIME NOT NULL,
-    used BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_phone (phone)
-);
 -- New database tables
 CREATE TABLE restaurant_earnings (
   id INT PRIMARY KEY AUTO_INCREMENT,

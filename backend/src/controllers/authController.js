@@ -11,7 +11,7 @@ exports.register = async (req, res) => {
             // Restaurant fields
             business, website, message, city, type,
             // Delivery fields
-            vehicle, license, insurance
+            vehicle, license, insurance, face_photo
         } = req.body;
 
         if (!name || !email || !password) return res.status(400).json({ message: 'Nom, email et mot de passe requis' });
@@ -23,12 +23,13 @@ exports.register = async (req, res) => {
         const isActive = true;
 
         const [result] = await db.execute(
-            'INSERT INTO users (name, email, password, role, phone, address, isVerified, isActive, vehicle_type, has_license, has_insurance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO users (name, email, password, role, phone, address, isVerified, isActive, vehicle_type, has_license, has_insurance, face_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name, email, hashed, userRole, phone || null, address || null, isVerified, isActive,
                 userRole === 'delivery' ? (vehicle || null) : null,
                 userRole === 'delivery' ? (license || null) : null,
-                userRole === 'delivery' ? (insurance || null) : null
+                userRole === 'delivery' ? (insurance || null) : null,
+                userRole === 'delivery' ? (face_photo || null) : null
             ]
         );
 

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, MapPin, X } from "lucide-react";
+import { Search, MapPin, X, Utensils, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import burgerImg from "../assets/burger.png";
 import pizzaImg from "../assets/pizza.png";
 import heroImg from "../assets/hero.png";
 import restoImg from "../assets/resto.jpg";
@@ -9,12 +10,15 @@ import food1 from "../assets/1.jpeg";
 import food2 from "../assets/2.jpeg";
 import food3 from "../assets/3.jpeg";
 import food4 from "../assets/4.jpeg";
+import designImg from "../assets/design.png";
 import PartnerSection from "../components/PartnerSection";
 import FeaturesSection from "../components/FeaturesSection";
 import CategoriesSection from "../components/CategoriesSection";
 import FAQSection from "../components/FAQSection";
 import SectionTitle from "../components/SectionTitle";
 import RestaurantsSection from "../components/RestaurantsSection";
+import ClientReviewsSection from "../components/ClientReviewsSection";
+import { useLanguage } from "../context/LanguageContext";
 
 
 
@@ -22,10 +26,11 @@ const LocationModal = ({ isOpen, onClose }) => {
   const [address, setAddress] = React.useState('');
   const [locLoading, setLocLoading] = React.useState(false);
   const [locError, setLocError] = React.useState('');
+  const { t } = useLanguage();
 
   const handleUsePosition = () => {
     if (!navigator.geolocation) {
-      setLocError('La géolocalisation n\'est pas supportée par votre navigateur.');
+      setLocError(t('locationErrorGeo'));
       return;
     }
     setLocLoading(true);
@@ -50,8 +55,8 @@ const LocationModal = ({ isOpen, onClose }) => {
       },
       (err) => {
         setLocLoading(false);
-        if (err.code === 1) setLocError('Accès refusé. Veuillez autoriser la géolocalisation dans votre navigateur.');
-        else setLocError('Impossible d\'obtenir votre position. Réessayez.');
+        if (err.code === 1) setLocError(t('locationErrorDenied'));
+        else setLocError(t('locationErrorFailed'));
       },
       { timeout: 10000 }
     );
@@ -91,14 +96,14 @@ const LocationModal = ({ isOpen, onClose }) => {
               <X size={20} />
             </button>
             <h2 style={{ fontSize: '36px', fontWeight: '950', marginBottom: '35px', color: '#111' }}>
-              Où devons-nous livrer ?
+              {t('whereDeliver')}
             </h2>
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #ddd', borderRadius: '999px', padding: '18px 25px' }}>
                 <Search size={22} style={{ color: '#888', marginRight: '15px', flexShrink: 0 }} />
                 <input
                   type="text"
-                  placeholder="Chercher l'adresse"
+                  placeholder={t('searchAddress')}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   style={{ width: '100%', border: 'none', outline: 'none', fontSize: '18px', fontWeight: '500' }}
@@ -124,7 +129,7 @@ const LocationModal = ({ isOpen, onClose }) => {
                 opacity: locLoading ? 0.7 : 1,
               }}
             >
-              <MapPin size={22} /> {locLoading ? 'Localisation...' : 'Utiliser ma position'}
+              <MapPin size={22} /> {locLoading ? t('locationLoading') : t('usePosition')}
             </button>
 
             {address && (
@@ -137,7 +142,7 @@ const LocationModal = ({ isOpen, onClose }) => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                 }}
               >
-                Confirmer l'adresse
+                {t('confirmAddress')}
               </button>
             )}
           </motion.div>
@@ -150,29 +155,63 @@ const LocationModal = ({ isOpen, onClose }) => {
 export default function Home() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div style={{ background: '#fff', minHeight: '100vh' }}>
+      <style>{`
+        @media (max-width: 899px) {
+          section {
+            flex-direction: column !important;
+            padding: 60px 40px !important;
+            min-height: auto !important;
+          }
+          section > div:first-child {
+            top: 0 !important;
+            left: 0 !important;
+            min-width: 100% !important;
+            height: auto !important;
+          }
+          .hero-content {
+            padding: 0 !important;
+            text-align: center;
+            margin-top: 30px;
+            margin-left: 0 !important;
+          }
+          .hero-buttons {
+            justify-content: center !important;
+          }
+          .burger-img {
+            width: 100% !important;
+            max-width: 420px !important;
+          }
+        }
+        @media (min-width: 900px) {
+          .hero-content {
+            text-align: left !important;
+          }
+          .hero-buttons {
+            justify-content: flex-start !important;
+          }
+        }
+      `}</style>
       <LocationModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} />
 
       {/* ── HERO ── */}
       <section style={{
         background: '#A51C1C',
-        minHeight: '100vh',
+        minHeight: '750px',
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'visible',
         display: 'flex',
         alignItems: 'center',
-        paddingTop: '100px',
-        paddingBottom: '120px',
+        padding: '0 80px',
       }}>
-
         {/* Radial glow */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'radial-gradient(ellipse 70% 60% at 60% 50%, rgba(255,255,255,0.07) 0%, transparent 70%)',
         }} />
-
         {/* Decorative dots */}
         {[
           { top: '20%', left: '22%', s: 7 }, { top: '50%', left: '18%', s: 5 },
@@ -186,119 +225,157 @@ export default function Home() {
           }} />
         ))}
 
-        {/* ── Main content: text LEFT + image RIGHT ── */}
+        {/* ── Burger Image ── */}
         <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          padding: '0 40px',
-          width: '100%',
+          flex: '1',
           display: 'flex',
+          justifyContent: 'flex-start',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '40px',
           position: 'relative',
-          zIndex: 5,
+          top: '80px',
+          left: '20px',
+          zIndex: 10,
+          minWidth: '650px',
+          height: '500px',
         }}>
+          {/* Design Image on top, right side */}
+          <motion.img
+            src={designImg}
+            alt="Design"
+            style={{
+              position: 'absolute',
+              right: '120px',
+              top: '-20px',
+              width: '150px',
+              height: 'auto',
+              zIndex: 20,
+            }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+          />
 
-          {/* LEFT — Text */}
-          <motion.div
-            initial={{ opacity: 0, x: -40 }}
+          {/* Burger Image */}
+          <motion.img
+            className="burger-img"
+            src={burgerImg}
+            alt="Burger"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4, duration: 0.9, type: 'spring', stiffness: 70 }}
+            style={{
+              width: '100%',
+              maxWidth: '650px',
+              height: 'auto',
+            }}
+          />
+        </div>
+
+        {/* ── Hero Content ── */}
+        <div className="hero-content" style={{
+          flex: '0 0 500px',
+          maxWidth: '600px',
+        }}>
+          <motion.h1 
+            initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2, duration: 0.8 }}
-            style={{ flex: 1, maxWidth: '560px', marginTop: '-80px' }}
-          >
-            <h1 style={{
-              fontSize: 'clamp(48px, 6vw, 90px)',
+            transition={{ delay: 0.3, duration: 0.8 }}
+            style={{
+              fontSize: 'clamp(50px, 8vw, 110px)',
               fontWeight: '900',
-              color: '#fff',
-              lineHeight: 0.92,
-              letterSpacing: '-2px',
-              textTransform: 'uppercase',
-              margin: '0 0 28px',
-              textShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              color: '#FFD700',
+              lineHeight: 0.95,
+              fontFamily: 'cursive, "Brush Script MT", "Comic Sans MS", "Bradley Hand", sans-serif',
+              textShadow: '4px 4px 0px rgba(0,0,0,0.4)',
+              margin: '0 0 25px',
+              letterSpacing: '2px',
+              transform: 'rotate(-2deg)',
             }}>
-              TASTE THE<br />DIFFERENCE
-            </h1>
-
-            <p style={{
-              color: 'rgba(255,255,255,0.75)',
-              fontSize: '17px',
-              fontWeight: '500',
-              lineHeight: '1.65',
-              marginBottom: '40px',
-              maxWidth: '420px',
-            }}>
-              De la table du chef à votre porte — livraison rapide, 24/7, partout au Maroc.
-            </p>
-
-            {/* CTA buttons */}
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-              <motion.button
+            {(() => {
+              const text = t('heroTitle');
+              const firstSpace = text.indexOf(' ');
+              if (firstSpace === -1) return text;
+              const firstWord = text.substring(0, firstSpace);
+              const rest = text.substring(firstSpace);
+              return (
+                <>
+                  {firstWord}{' '}
+                  <Clock size={70} strokeWidth={3} color="#FFD700" style={{ display: 'inline-block', marginRight: '15px', marginLeft: '15px', verticalAlign: 'middle' }} />
+                  {rest}
+                </>
+              );
+            })()}
+          </motion.h1>
+          {/* CTA buttons */}
+          <div className="hero-buttons" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+            <motion.button
                 whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.97 }}
                 onClick={() => setIsLocationModalOpen(true)}
                 style={{
-                  background: '#fff', color: '#A51C1C',
-                  padding: '16px 34px', borderRadius: '999px', border: 'none',
+                  background: '#FFD700', color: '#000',
+                  padding: '16px 50px', borderRadius: '20px', border: 'none',
                   fontWeight: '900', fontSize: '15px', cursor: 'pointer',
                   boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
                   display: 'flex', alignItems: 'center', gap: '9px',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <MapPin size={17} /> Order Now
+                <MapPin size={17} /> {t('heroBtn')}
               </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.97 }}
-                onClick={() => navigate('/menu')}
-                style={{
-                  background: 'rgba(255,255,255,0.12)', color: '#fff',
-                  padding: '16px 34px', borderRadius: '999px',
-                  border: '2px solid rgba(255,255,255,0.35)',
-                  fontWeight: '800', fontSize: '15px', cursor: 'pointer',
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex', alignItems: 'center', gap: '9px',
-                }}
-              >
-                <Search size={17} /> Explore Menu
-              </motion.button>
-            </div>
-          </motion.div>
-
-          {/* RIGHT — Pizza image */}
-          <motion.div
-            initial={{ opacity: 0, x: 60, scale: 0.85 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ delay: 0.4, duration: 0.9, type: 'spring', stiffness: 70 }}
-            style={{
-              flex: 1,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              maxWidth: '520px',
-              filter: 'drop-shadow(0 40px 70px rgba(0,0,0,0.5))',
-            }}
-          >
-            <motion.img
-              src={pizzaImg}
-              alt="Pizza"
-              animate={{ y: [0, -16, 0], rotate: [0, 1.5, 0] }}
-              transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ width: '100%', maxWidth: '480px', objectFit: 'contain' }}
-            />
-          </motion.div>
-        </div>
-
-        {/* White wave cutout at bottom */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', lineHeight: 0, zIndex: 6 }}>
-          <svg viewBox="0 0 1440 100" fill="#fff" xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: '100px' }}>
-            <path d="M0,40 C240,100 480,0 720,50 C960,100 1200,10 1440,50 L1440,100 L0,100 Z" />
-          </svg>
+          </div>
         </div>
       </section>
 
+      {/* Double Wave Divider (exactly like reference) */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        marginTop: '-100px',
+        zIndex: 5,
+      }}>
+        {/* Top Subtle Wave */}
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          viewBox="0 0 1440 100" 
+          preserveAspectRatio="none" 
+          style={{ 
+            width: '100%', 
+            height: '100px', 
+            display: 'block',
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            opacity: '0.5'
+          }}
+        >
+          <path 
+            d="M0,20 C360,50 720,50 1080,50 C1260,50 1350,20 1440,20 L1440,100 L0,100 Z" 
+            fill="#fff" 
+          />
+        </svg>
+
+        {/* Bottom Main Wave */}
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          viewBox="0 0 1440 100" 
+          preserveAspectRatio="none" 
+          style={{ 
+            width: '100%', 
+            height: '100px', 
+            display: 'block',
+            position: 'relative',
+            top: '0'
+          }}
+        >
+          <path 
+            d="M0,0 C360,30 720,30 1080,30 C1260,30 1350,0 1440,0 L1440,100 L0,100 Z" 
+            fill="#fff" 
+          />
+        </svg>
+      </div>
+
       {/* Rest of page */}
-      <div style={{ paddingBottom: '100px' }}>
+      <div style={{ paddingTop: '140px', paddingBottom: '100px' }}>
 
         {/* ── PROMO SECTION — text left + image right ── */}
         <section style={{ padding: '80px 40px', background: '#fff' }}>
@@ -309,18 +386,21 @@ export default function Home() {
               style={{ flex: 1, minWidth: '280px' }}
             >
               <h2 style={{ fontSize: 'clamp(28px, 4vw, 50px)', fontWeight: '950', color: '#111', lineHeight: 1.1, marginBottom: '16px', letterSpacing: '-1px' }}>
-                Tout ce que<br />vous adorez,<br /><span style={{ color: '#A51C1C' }}>livré chez vous.</span>
+                {t('promoTitle').split(',').map((part, index) => {
+                  if (index === 0) return <span key={index}>{part},<br /></span>;
+                  return <span key={index} style={{ color: '#A51C1C' }}>{part}</span>;
+                })}
               </h2>
-              <p style={{ fontWeight: '800', fontSize: '16px', color: '#111', marginBottom: '8px' }}>Vos restaurants locaux préférés</p>
+              <p style={{ fontWeight: '800', fontSize: '16px', color: '#111', marginBottom: '8px' }}>{t('promoSubtitle')}</p>
               <p style={{ color: '#666', fontSize: '15px', lineHeight: '1.7', marginBottom: '32px', maxWidth: '380px' }}>
-                Commandez une pizza, un burger ou votre plat préféré depuis les meilleurs restaurants de votre ville — livré en moins de 45 minutes.
+                {t('promoDesc')}
               </p>
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.97 }}
                 onClick={() => navigate('/menu')}
                 style={{ background: '#A51C1C', color: '#fff', padding: '16px 36px', borderRadius: '999px', border: 'none', fontWeight: '800', fontSize: '15px', cursor: 'pointer', boxShadow: '0 8px 25px rgba(165,28,28,0.3)' }}
               >
-                Trouver des restaurants
+                {t('promoBtn')}
               </motion.button>
             </motion.div>
 
@@ -340,10 +420,11 @@ export default function Home() {
 
         <CategoriesSection />
         <SectionTitle
-          title="Les meilleurs restaurants au Maroc"
-          subtitle="Découvrez une sélection variée des meilleurs établissements près de chez vous."
+          title={t('bestRestoTitle')}
+          subtitle={t('bestRestoSub')}
         />
         <RestaurantsSection />
+        <ClientReviewsSection />
         <PartnerSection />
         <FeaturesSection />
         <FAQSection />

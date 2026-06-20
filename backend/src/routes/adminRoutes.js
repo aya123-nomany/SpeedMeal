@@ -255,7 +255,7 @@ router.get('/drivers', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.execute(
             `SELECT u.id, u.name, u.email, u.phone, u.address, u.isActive, u.created_at,
-                    u.vehicle_type, u.has_license, u.has_insurance,
+                    u.vehicle_type, u.has_license, u.has_insurance, u.face_photo, u.is_available,
                     COUNT(o.id)                                    AS total_deliveries,
                     COALESCE(SUM(o.total_price), 0)                AS total_revenue,
                     SUM(o.status = 'delivered')                    AS delivered_count,
@@ -291,7 +291,7 @@ router.get('/pending/delivery', isAdmin, async (req, res) => {
     try {
         const [rows] = await db.execute(
             `SELECT id AS user_id, name, email, phone, address, created_at, isActive,
-                    vehicle_type, has_license, has_insurance
+                    vehicle_type, has_license, has_insurance, face_photo
              FROM users
              WHERE role = 'delivery' AND isVerified = FALSE AND isActive = TRUE
              ORDER BY created_at DESC`

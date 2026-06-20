@@ -5,6 +5,7 @@ const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 router.get('/',           resController.getAllRestaurants);
 router.get('/categories', resController.getCategories);
+router.get('/menu-categories', resController.getMenuCategories);
 router.get('/:id',        resController.getRestaurantById);
 router.post('/',          authMiddleware, roleMiddleware(['restaurant', 'admin']), resController.createRestaurant);
 router.post('/menu',      authMiddleware, roleMiddleware(['restaurant', 'admin']), resController.addMenuItem);

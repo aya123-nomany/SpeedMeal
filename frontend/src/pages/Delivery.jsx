@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bike, DollarSign, Clock, Shield, ChevronDown,
   CheckCircle, Star, Zap, Wifi, Smartphone, X,
-  Mail, Phone as PhoneIcon, MapPin, Car, Wrench
+  Mail, Phone as PhoneIcon, MapPin, Car, Wrench,
+  Camera, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -133,6 +134,7 @@ const RadioField = React.memo(({ value, onChange, error, label }) => {
             padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
             border: `1.5px solid ${value === val ? '#A51C1C' : 'rgba(255,255,255,0.12)'}`,
             background: value === val ? 'rgba(165,28,28,0.15)' : 'rgba(255,255,255,0.06)',
+            color: '#fff', fontSize: '14px', fontWeight: '600',
             transition: 'all 0.2s'
           }}
           onMouseEnter={e => e.currentTarget.style.background = value === val ? 'rgba(165,28,28,0.2)' : 'rgba(255,255,255,0.1)'}
@@ -153,10 +155,70 @@ const RadioField = React.memo(({ value, onChange, error, label }) => {
   return prevProps.error === nextProps.error && prevProps.label === nextProps.label && prevProps.value === nextProps.value;
 });
 
+/* ─── IMAGE UPLOAD FIELD ─── */
+const ImageUploadField = React.memo(({ value, onChange, error, label }) => {
+  const inputRef = React.useRef();
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Image trop grande (max 5 Mo)'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div>
+      <label style={{ fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        {label} <span style={{ color: '#ef4444' }}>*</span>
+      </label>
+      <div
+        onClick={() => inputRef.current.click()}
+        style={{
+          border: `2px dashed ${error ? '#ef4444' : value ? '#A51C1C' : 'rgba(255,255,255,0.15)'}`,
+          borderRadius: '12px', cursor: 'pointer', overflow: 'hidden',
+          transition: 'border-color 0.2s, background 0.2s',
+          background: value ? 'transparent' : 'rgba(255,255,255,0.03)',
+          minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onMouseEnter={e => { if (!value) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+        onMouseLeave={e => { if (!value) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+      >
+        {value ? (
+          <div style={{ position: 'relative', width: '100%' }}>
+            <img src={value} alt="Preview" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', borderRadius: '10px' }} />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(''); }}
+              style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}
+            >
+              <X size={14} color="#fff"/>
+            </button>
+            <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(165,28,28,0.85)', borderRadius: '6px', padding: '3px 10px', fontSize: '11px', color: '#fff', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Check size={11} color="#fff"/> Image sélectionnée
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+              <Camera size={32} color="rgba(255,255,255,0.4)"/>
+            </div>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600' }}>Cliquez pour ajouter votre photo de visage</p>
+            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>JPG, PNG — max 5 Mo</p>
+          </div>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginTop: '4px' }}>{error}</p>}
+    </div>
+  );
+});
+
 const SignupModal = ({ isOpen, onClose }) => {
   const [form, setForm] = useState({
     name: '', email: '', password: '', phone: '', city: '', vehicle: '',
-    license: '', insurance: '', accept: false,
+    license: '', insurance: '', face_photo: '', accept: false,
   });
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -177,6 +239,7 @@ const SignupModal = ({ isOpen, onClose }) => {
     if (!form.vehicle)          e.vehicle   = 'Requis';
     if (!form.license)          e.license   = 'Répondez';
     if (!form.insurance)        e.insurance = 'Répondez';
+    if (!form.face_photo)       e.face_photo = 'Photo de visage requise';
     if (!form.accept)           e.accept    = 'Veuillez accepter';
     return e;
   };
@@ -197,7 +260,8 @@ const SignupModal = ({ isOpen, onClose }) => {
         address: form.city,
         vehicle: form.vehicle,
         license: form.license,
-        insurance: form.insurance
+        insurance: form.insurance,
+        face_photo: form.face_photo
       });
       setSubmitted(true);
     } catch (err) {
@@ -206,7 +270,13 @@ const SignupModal = ({ isOpen, onClose }) => {
     setLoading(false);
   };
 
-  const cities = ['Casablanca','Rabat','Marrakech','Fès','Tanger','Agadir','Meknès','Oujda','Kenitra','Tétouan'].map(c => ({ value: c, label: c }));
+  const cities = [
+    'Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès', 'Oujda', 'Kenitra', 'Tétouan',
+    'Salé', 'Nador', 'Safi', 'Mohammedia', 'Khouribga', 'El Jadida', 'Beni Mellal', 'Taza', 'Khemisset', 'Larache',
+    'Guelmim', 'Berrechid', 'Taourirt', 'Taroudant', 'Ouarzazate', 'Dakhla', 'Laâyoune', 'Al Hoceima', 'Tiznit', 'Ifrane',
+    'Azrou', 'Chefchaouen', 'Essaouira', 'Asilah', 'El Kelaa des Sraghna', 'Sidi Slimane', 'Sidi Kacem', 'Berkane', 'Errachidia', 'Midelt',
+    'Tinghir', 'Zagora', 'Tan-Tan', 'Sidi Ifni', 'Tarfaya', 'Boujdour', 'Smara', 'Khenifra', 'Fnideq', 'M\'diq', 'Martil'
+  ].map(c => ({ value: c, label: c }));
   const vehicles = [
     { value: 'velo', label: 'Vélo', icon: Bike },
     { value: 'scooter', label: 'Scooter / Moto', icon: Wrench },
@@ -243,7 +313,7 @@ const SignupModal = ({ isOpen, onClose }) => {
                 <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '15px', lineHeight: '1.7', marginBottom: '28px' }}>
                   Merci <strong style={{ color: '#fff' }}>{form.name}</strong> ! Notre équipe vous contactera au <strong style={{ color: '#fff' }}>{form.phone}</strong> dans les 48h.
                 </p>
-                <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', password: '', phone: '', city: '', vehicle: '', license: '', insurance: '', accept: false }); setErrors({}); }}
+                <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', password: '', phone: '', city: '', vehicle: '', license: '', insurance: '', face_photo: '', accept: false }); setErrors({}); }}
                   style={{ background: '#A51C1C', color: '#fff', border: 'none', padding: '14px 32px', borderRadius: '999px', fontWeight: '800', cursor: 'pointer', fontSize: '15px' }}>
                   Nouvelle inscription
                 </button>
@@ -268,6 +338,13 @@ const SignupModal = ({ isOpen, onClose }) => {
 
                   <RadioField value={form.license} onChange={(val) => set('license', val)} error={errors.license} label="Avez-vous un permis de conduire ?" />
                   <RadioField value={form.insurance} onChange={(val) => set('insurance', val)} error={errors.insurance} label="Avez-vous une assurance pour le véhicule ?" />
+
+                  <ImageUploadField
+                    value={form.face_photo}
+                    onChange={(val) => set('face_photo', val)}
+                    error={errors.face_photo}
+                    label="Photo de votre visage"
+                  />
 
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', paddingTop: '4px' }}>
                     <div onClick={() => set('accept', !form.accept)}

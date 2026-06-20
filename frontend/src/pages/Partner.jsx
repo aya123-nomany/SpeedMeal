@@ -217,13 +217,19 @@ const SignupModal = ({ isOpen, onClose }) => {
       console.log('Registration successful:', response.data);
       setSubmitted(true);
     } catch (err) {
-      console.error('Registration error:', err.response?.data);
-      setErrors({ submit: err.response?.data?.message || err.response?.data?.error || 'Erreur lors de l\'inscription' });
+      console.error('Registration error:', err.response?.data || err.message);
+      setErrors({ submit: err.response?.data?.message || err.response?.data?.error || err.message || 'Erreur lors de l\'inscription' });
     }
     setLoading(false);
   };
 
-  const cities = ['Casablanca','Rabat','Marrakech','Fès','Tanger','Agadir','Meknès','Oujda','Kenitra','Tétouan'].map(c => ({ value: c, label: c }));
+  const cities = [
+    'Casablanca', 'Rabat', 'Marrakech', 'Fès', 'Tanger', 'Agadir', 'Meknès', 'Oujda', 'Kenitra', 'Tétouan',
+    'Salé', 'Nador', 'Safi', 'Mohammedia', 'Khouribga', 'El Jadida', 'Beni Mellal', 'Taza', 'Khemisset', 'Larache',
+    'Guelmim', 'Berrechid', 'Taourirt', 'Taroudant', 'Ouarzazate', 'Dakhla', 'Laâyoune', 'Al Hoceima', 'Tiznit', 'Ifrane',
+    'Azrou', 'Chefchaouen', 'Essaouira', 'Asilah', 'El Kelaa des Sraghna', 'Sidi Slimane', 'Sidi Kacem', 'Berkane', 'Errachidia', 'Midelt',
+    'Tinghir', 'Zagora', 'Tan-Tan', 'Sidi Ifni', 'Tarfaya', 'Boujdour', 'Smara', 'Khenifra', 'Fnideq', 'M\'diq', 'Martil'
+  ].map(c => ({ value: c, label: c }));
   const types  = [
     { value: 'restaurant',  label: 'Restaurant',  icon: Utensils },
     { value: 'cafe',        label: 'Café',        icon: Coffee },
@@ -327,6 +333,13 @@ const Partner = () => {
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [stats, setStats] = React.useState({ totalRestaurants: 0, totalClients: 0 });
+
+  React.useEffect(() => {
+    axios.get('http://localhost:5000/api/public-stats')
+      .then(res => setStats(res.data))
+      .catch(err => console.error(err));
+  }, []);
 
   const tabs = [
     {
@@ -397,7 +410,12 @@ const Partner = () => {
       {/* ── STATS ── */}
       <section style={{ padding: '60px 40px', background: '#fff' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '60px', flexWrap: 'wrap', textAlign: 'center' }}>
-          {[['500+', 'Restaurants partenaires'], ['50K+', 'Clients actifs'], ['48h', 'Délai d\'activation'], ['7j/7', 'Support dédié']].map(([n, l]) => (
+          {[
+            [stats.totalRestaurants !== undefined ? stats.totalRestaurants : '0', 'Restaurants partenaires'],
+            [stats.totalClients !== undefined ? stats.totalClients : '0', 'Clients actifs'],
+            ['48h', 'Délai d\'activation'],
+            ['7j/7', 'Support dédié']
+          ].map(([n, l]) => (
             <motion.div key={l} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
               <div style={{ fontSize: '36px', fontWeight: '950', color: '#A51C1C' }}>{n}</div>
               <div style={{ fontSize: '13px', color: '#999', fontWeight: '600', marginTop: '4px' }}>{l}</div>

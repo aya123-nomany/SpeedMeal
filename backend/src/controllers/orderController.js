@@ -8,7 +8,9 @@ exports.createOrder = async (req, res) => {
         const {
             restaurant_id, items, total_price, address,
             payment_method, coupon_id, discount_amount,
-            note, delivery_time, stripe_payment_intent
+            note, delivery_time, stripe_payment_intent,
+            payment_status: requestedPaymentStatus,
+            delivery_lat, delivery_lng
         } = req.body;
 
         if (!restaurant_id || !items?.length || !total_price || !address || !payment_method) {
@@ -28,13 +30,15 @@ exports.createOrder = async (req, res) => {
         // 1. Create order
         const [orderResult] = await connection.execute(
             `INSERT INTO orders
-             (user_id, restaurant_id, total_price, address, payment_method, coupon_id, discount_amount, note, delivery_time, stripe_payment_intent, payment_status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (user_id, restaurant_id, total_price, address, delivery_lat, delivery_lng, payment_method, coupon_id, discount_amount, note, delivery_time, stripe_payment_intent, payment_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                req.user.id, restaurant_id, total_price, address, payment_method,
+                req.user.id, restaurant_id, total_price, address,
+                delivery_lat || null, delivery_lng || null,
+                payment_method,
                 coupon_id || null, discount_amount || 0, note || null,
                 delivery_time || null, stripe_payment_intent || null,
-                payment_method === 'card' && stripe_payment_intent ? 'paid' : 'pending'
+                requestedPaymentStatus || (payment_method === 'card' && stripe_payment_intent ? 'paid' : 'pending')
             ]
         );
         const orderId = orderResult.insertId;
@@ -72,6 +76,8 @@ exports.createOrder = async (req, res) => {
 
         await connection.commit();
 
+        const io = req.app.get('io');
+
         // 5. Notify restaurant owner (async, don't block response)
         const [[restaurant]] = await db.execute(
             'SELECT owner_id, name FROM restaurants WHERE id = ?',
@@ -82,11 +88,11 @@ exports.createOrder = async (req, res) => {
                 restaurant.owner_id,
                 'Nouvelle commande!',
                 `Commande #${orderId} reçue — ${Number(total_price).toFixed(2)} MAD`,
-                'order'
+                'order',
+                io
             );
 
             // Socket notification
-            const io = req.app.get('io');
             if (io) {
                 io.to(`restaurant_${restaurant_id}`).emit('newOrder', { orderId, total_price });
             }
@@ -97,7 +103,8 @@ exports.createOrder = async (req, res) => {
             req.user.id,
             'Commande confirmée',
             `Votre commande #${orderId} a bien été reçue et est en cours de traitement.`,
-            'order'
+            'order',
+            io
         );
 
         res.status(201).json({ message: 'Order placed successfully', orderId, points_earned: points });
@@ -141,11 +148,14 @@ exports.getUserOrders = async (req, res) => {
 exports.getOrderById = async (req, res) => {
     try {
         const [[order]] = await db.execute(
-            `SELECT o.*, r.name AS restaurant_name, r.address AS restaurant_address,
+            `SELECT o.*, r.name AS restaurant_name, r.address AS restaurant_address, 
                     r.latitude AS rest_lat, r.longitude AS rest_lng,
                     r.image_url AS restaurant_image,
+                    r.rating AS restaurant_rating,
                     u.name AS client_name, u.phone AS client_phone,
-                    d.name AS driver_name, d.phone AS driver_phone
+                    d.name AS driver_name, d.phone AS driver_phone,
+                    d.rating AS driver_rating,
+                    o.delivery_lat, o.delivery_lng
              FROM orders o
              JOIN restaurants r ON o.restaurant_id = r.id
              JOIN users u ON o.user_id = u.id
@@ -199,7 +209,7 @@ exports.getOrderById = async (req, res) => {
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const validStatuses = ['pending', 'preparing', 'on_the_way', 'delivered', 'cancelled'];
+        const validStatuses = ['pending', 'accepted', 'preparing', 'ready', 'searching_driver', 'driver_assigned', 'driver_at_restaurant', 'on_the_way', 'delivered', 'cancelled'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'Invalid status' });
         }
@@ -207,21 +217,41 @@ exports.updateOrderStatus = async (req, res) => {
         const [[order]] = await db.execute('SELECT * FROM orders WHERE id = ?', [req.params.id]);
         if (!order) return res.status(404).json({ message: 'Order not found' });
 
+        // Allow client to mark their own order as delivered (for simulation/testing)
+        // Or allow restaurant, driver, or admin to update status
+        if (
+            req.user.role !== 'admin' &&
+            req.user.role !== 'restaurant' &&
+            req.user.role !== 'delivery' &&
+            !(req.user.id === order.user_id && status === 'delivered')
+        ) {
+            // Check if user is restaurant owner
+            const [[rest]] = await db.execute('SELECT owner_id FROM restaurants WHERE id = ?', [order.restaurant_id]);
+            if (!rest || rest.owner_id !== req.user.id) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+        }
+
         await db.execute('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id]);
 
         // Notify client
         const statusMessages = {
-            preparing:  'Votre commande est en cours de préparation 🍳',
-            on_the_way: 'Votre commande est en route! 🛵',
-            delivered:  'Votre commande a été livrée! Bon appétit 🎉',
+            accepted:   'Votre commande a été acceptée par le restaurant',
+            preparing:  'Votre commande est en cours de préparation',
+            ready:      'Votre commande est prête et attend un livreur',
+            driver_assigned: 'Un livreur est en route vers le restaurant',
+            driver_at_restaurant: 'Le livreur récupère votre commande',
+            on_the_way: 'Votre commande est en route vers vous!',
+            delivered:  'Votre commande a été livrée! Bon appétit',
             cancelled:  'Votre commande a été annulée.',
         };
 
+        const io = req.app.get('io');
+
         if (statusMessages[status]) {
-            await createNotification(order.user_id, 'Mise à jour commande', statusMessages[status], 'order');
+            await createNotification(order.user_id, 'Mise à jour commande', statusMessages[status], 'order', io);
         }
 
-        const io = req.app.get('io');
         if (io) {
             io.to(`order_${req.params.id}`).emit('orderStatusUpdate', { orderId: req.params.id, status });
         }
@@ -277,6 +307,85 @@ exports.reorder = async (req, res) => {
             payment_method: order.payment_method,
             items: availableItems
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Cancel Order (User)
+exports.cancelOrder = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        
+        const [[order]] = await db.execute(
+            'SELECT * FROM orders WHERE id = ? AND user_id = ?',
+            [req.params.id, req.user.id]
+        );
+        
+        if (!order) return res.status(404).json({ message: 'Order not found' });
+
+        // Check if order can be cancelled (only pending/accepted)
+        const allowedStatuses = ['pending', 'accepted'];
+        if (!allowedStatuses.includes(order.status)) {
+            return res.status(400).json({ 
+                message: 'You can only cancel orders that are pending or accepted' 
+            });
+        }
+
+        // Update order
+        await db.execute(
+            'UPDATE orders SET status = ?, cancel_reason = ?, delivery_id = NULL WHERE id = ?',
+            ['cancelled', reason || null, req.params.id]
+        );
+
+        const io = req.app.get('io');
+        
+        // Notify restaurant
+        const [[restaurant]] = await db.execute(
+            'SELECT owner_id, name FROM restaurants WHERE id = ?',
+            [order.restaurant_id]
+        );
+        if (restaurant) {
+            await createNotification(
+                restaurant.owner_id,
+                'Commande annulée',
+                `Commande #${req.params.id} a été annulée par le client.`,
+                'order',
+                io
+            );
+            if (io) {
+                io.to(`restaurant_${order.restaurant_id}`).emit('orderCancelled', { orderId: req.params.id });
+            }
+        }
+
+        // Notify driver if assigned
+        if (order.delivery_id) {
+            await createNotification(
+                order.delivery_id,
+                'Livraison annulée',
+                `La livraison de la commande #${req.params.id} a été annulée.`,
+                'order',
+                io
+            );
+            if (io) {
+                io.to(`driver_${order.delivery_id}`).emit('orderCancelled', { orderId: req.params.id });
+            }
+        }
+
+        // Notify client
+        await createNotification(
+            req.user.id,
+            'Commande annulée',
+            `Votre commande #${req.params.id} a bien été annulée.`,
+            'order',
+            io
+        );
+
+        if (io) {
+            io.to(`order_${req.params.id}`).emit('orderStatusUpdate', { orderId: req.params.id, status: 'cancelled' });
+        }
+
+        res.json({ message: 'Order cancelled successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

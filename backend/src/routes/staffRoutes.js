@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const staffController = require('../controllers/staffController');
-const authMiddleware = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 
 // Get all staff
 router.get('/:restaurantId/staff', authMiddleware, staffController.getStaff);

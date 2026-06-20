@@ -56,12 +56,17 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 // ── Helper: create notification (used internally) ───────────────────────────
-const createNotification = async (userId, title, message, type = 'system') => {
+const createNotification = async (userId, title, message, type = 'system', io = null) => {
     try {
         await db.execute(
             'INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, ?)',
             [userId, title, message, type]
         );
+
+        // Emit socket event if io is provided
+        if (io) {
+            io.to(`user_${userId}`).emit('newNotification', { title, message, type });
+        }
     } catch (_) {}
 };
 
