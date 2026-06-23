@@ -37,3 +37,9 @@ forecast-service/__pycache__/
 forecast-service/*.egg-info/
 forecast-service/venv/
 forecast-service/.venv/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
