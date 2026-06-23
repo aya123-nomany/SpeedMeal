@@ -50,10 +50,47 @@ export default function ClientReviewsSection() {
   };
 
   return (
-    <section style={{ padding: '80px 40px', background: '#fff4ee' }}>
+    <section style={{ padding: '80px 20px', background: '#fff4ee' }}>
+      <style>{`
+        .reviews-nav-btn-left {
+          position: absolute;
+          top: 50%;
+          left: -60px;
+          transform: translateY(-50%);
+        }
+        .reviews-nav-btn-right {
+          position: absolute;
+          top: 50%;
+          right: -60px;
+          transform: translateY(-50%);
+        }
+        @media (max-width: 900px) {
+          .reviews-nav-btn-left {
+            left: -18px !important;
+            width: 38px !important;
+            height: 38px !important;
+          }
+          .reviews-nav-btn-right {
+            right: -18px !important;
+            width: 38px !important;
+            height: 38px !important;
+          }
+        }
+        @media (max-width: 600px) {
+          .reviews-card {
+            padding: 30px 20px !important;
+          }
+          .reviews-nav-btn-left, .reviews-nav-btn-right {
+            display: none !important;
+          }
+          .reviews-mobile-nav {
+            display: flex !important;
+          }
+        }
+      `}</style>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-          <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: '950', color: '#111', marginBottom: '10px' }}>
+          <h2 style={{ fontSize: 'clamp(26px, 4vw, 48px)', fontWeight: '950', color: '#111', marginBottom: '10px' }}>
             Ce que disent nos clients
           </h2>
           <p style={{ color: '#666', fontSize: '16px' }}>Des expériences réelles, des avis authentiques</p>
@@ -66,6 +103,7 @@ export default function ClientReviewsSection() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.4 }}
+            className="reviews-card"
             style={{
               background: '#fff',
               borderRadius: '24px',
@@ -88,7 +126,7 @@ export default function ClientReviewsSection() {
             </div>
 
             <p style={{
-              fontSize: '20px',
+              fontSize: 'clamp(15px, 2vw, 20px)',
               lineHeight: '1.7',
               color: '#333',
               marginBottom: '30px',
@@ -102,7 +140,7 @@ export default function ClientReviewsSection() {
               <img
                 src={REVIEWS[currentIndex].avatar}
                 alt={REVIEWS[currentIndex].name}
-                style={{ width: '60px', height: '60px', borderRadius: '50%', border: '3px solid #A51C1C' }}
+                style={{ width: '60px', height: '60px', borderRadius: '50%', border: '3px solid #A51C1C', flexShrink: 0 }}
               />
               <div style={{ textAlign: 'left' }}>
                 <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#111' }}>
@@ -115,73 +153,56 @@ export default function ClientReviewsSection() {
             </div>
           </motion.div>
 
-          {/* Navigation buttons */}
+          {/* Desktop nav buttons */}
           <button
             onClick={prev}
+            className="reviews-nav-btn-left"
             style={{
-              position: 'absolute',
-              top: '50%',
-              left: '-60px',
-              transform: 'translateY(-50%)',
-              background: '#A51C1C',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 15px rgba(165,28,28,0.3)',
-              transition: 'transform 0.2s'
+              background: '#A51C1C', color: '#fff', border: 'none', borderRadius: '50%',
+              width: '50px', height: '50px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 15px rgba(165,28,28,0.3)', transition: 'transform 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
           >
             <ChevronLeft size={24} />
           </button>
 
           <button
             onClick={next}
+            className="reviews-nav-btn-right"
             style={{
-              position: 'absolute',
-              top: '50%',
-              right: '-60px',
-              transform: 'translateY(-50%)',
-              background: '#A51C1C',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 15px rgba(165,28,28,0.3)',
-              transition: 'transform 0.2s'
+              background: '#A51C1C', color: '#fff', border: 'none', borderRadius: '50%',
+              width: '50px', height: '50px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 15px rgba(165,28,28,0.3)', transition: 'transform 0.2s'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
           >
             <ChevronRight size={24} />
           </button>
 
+          {/* Mobile nav buttons (visible only on small screens) */}
+          <div className="reviews-mobile-nav" style={{
+            display: 'none', justifyContent: 'center', gap: '16px', marginTop: '20px'
+          }}>
+            <button onClick={prev} style={{ background: '#A51C1C', color: '#fff', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronLeft size={20} />
+            </button>
+            <button onClick={next} style={{ background: '#A51C1C', color: '#fff', border: 'none', borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
           {/* Indicators */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '30px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '24px' }}>
             {REVIEWS.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrentIndex(i)}
                 style={{
                   width: i === currentIndex ? '30px' : '10px',
-                  height: '10px',
-                  borderRadius: '20px',
-                  border: 'none',
+                  height: '10px', borderRadius: '20px', border: 'none',
                   background: i === currentIndex ? '#A51C1C' : '#ddd',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s'
+                  cursor: 'pointer', transition: 'all 0.3s'
                 }}
               />
             ))}

@@ -160,53 +160,137 @@ export default function Home() {
   return (
     <div style={{ background: '#fff', minHeight: '100vh' }}>
       <style>{`
-        @media (max-width: 899px) {
-          section {
-            flex-direction: column !important;
-            padding: 60px 40px !important;
-            min-height: auto !important;
-          }
-          section > div:first-child {
-            top: 0 !important;
-            left: 0 !important;
-            min-width: 100% !important;
-            height: auto !important;
-          }
-          .hero-content {
-            padding: 0 !important;
-            text-align: center;
-            margin-top: 30px;
-            margin-left: 0 !important;
-          }
-          .hero-buttons {
-            justify-content: center !important;
-          }
-          .burger-img {
-            width: 100% !important;
-            max-width: 420px !important;
-          }
+        /* ── Hero ── */
+        .hero-section {
+          background: #A51C1C;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          padding: 90px 80px 40px;
+          min-height: 750px;
         }
-        @media (min-width: 900px) {
+        .hero-image-wrapper {
+          flex: 0 0 auto;
+          display: flex;
+          justify-content: center;
+          align-items: flex-end;
+          position: relative;
+          z-index: 10;
+          width: 500px;
+          height: 520px;
+          margin-top: 40px;
+        }
+        .burger-img {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+        .design-img {
+          position: absolute;
+          right: 40px;
+          top: 0;
+          width: 120px;
+          height: auto;
+          z-index: 20;
+        }
+        .hero-content {
+          flex: 1;
+          max-width: 560px;
+          text-align: left;
+          padding-left: 40px;
+        }
+        .hero-title {
+          font-size: clamp(40px, 5vw, 110px);
+          font-weight: 900;
+          color: #FFD700;
+          line-height: 1;
+          font-family: cursive, "Brush Script MT", "Comic Sans MS", sans-serif;
+          text-shadow: 4px 4px 0px rgba(0,0,0,0.4);
+          margin: 0 0 28px;
+          letter-spacing: 2px;
+          transform: rotate(-2deg);
+        }
+        .hero-clock-icon {
+          display: inline-block;
+          vertical-align: middle;
+          width: clamp(36px, 5vw, 70px) !important;
+          height: clamp(36px, 5vw, 70px) !important;
+          margin: 0 8px;
+        }
+        .hero-buttons {
+          display: flex;
+          gap: 14px;
+          flex-wrap: wrap;
+          justify-content: flex-start;
+        }
+
+        /* ── Tablet large (max 1100px) ── */
+        @media (max-width: 1100px) {
+          .hero-section { padding: 100px 40px 60px; min-height: 600px; }
+          .hero-image-wrapper { width: 340px; height: 360px; }
+          .hero-content { padding-left: 20px; }
+          .design-img { width: 80px; right: 10px; }
+        }
+
+        /* ── Tablet small — switch to column (max 900px) ── */
+        @media (max-width: 900px) {
+          .hero-section {
+            flex-direction: column !important;
+            padding: 76px 24px 50px !important;
+            min-height: auto !important;
+            align-items: center !important;
+          }
+          .hero-image-wrapper {
+            width: min(340px, 70vw) !important;
+            height: auto !important;
+            margin-top: 0 !important;
+            order: 1;
+          }
+          .burger-img { width: 100% !important; }
+          .design-img { width: 72px !important; right: 0 !important; top: 0 !important; }
           .hero-content {
-            text-align: left !important;
+            order: 2;
+            padding-left: 0 !important;
+            max-width: 600px !important;
+            width: 100%;
+            text-align: center !important;
           }
-          .hero-buttons {
-            justify-content: flex-start !important;
+          .hero-title {
+            font-size: clamp(30px, 6vw, 52px) !important;
+            letter-spacing: 0 !important;
+            transform: rotate(-1deg) !important;
+            word-break: break-word !important;
+            overflow-wrap: break-word !important;
           }
+          .hero-clock-icon {
+            width: clamp(26px, 5vw, 44px) !important;
+            height: clamp(26px, 5vw, 44px) !important;
+            margin: 0 6px !important;
+          }
+          .hero-buttons { justify-content: center !important; }
+        }
+
+        /* ── Mobile (max 600px) ── */
+        @media (max-width: 600px) {
+          .hero-section { padding: 74px 14px 44px !important; }
+          .hero-image-wrapper { width: min(260px, 75vw) !important; }
+          .hero-title { font-size: clamp(24px, 7.5vw, 36px) !important; }
+          .hero-clock-icon { width: clamp(22px, 6vw, 32px) !important; height: clamp(22px, 6vw, 32px) !important; }
+        }
+
+        /* ── Very small (max 380px) ── */
+        @media (max-width: 380px) {
+          .hero-section { padding: 70px 12px 36px !important; }
+          .hero-image-wrapper { width: 70vw !important; }
+          .hero-title { font-size: 22px !important; }
+          .hero-clock-icon { width: 20px !important; height: 20px !important; }
         }
       `}</style>
       <LocationModal isOpen={isLocationModalOpen} onClose={() => setIsLocationModalOpen(false)} />
 
       {/* ── HERO ── */}
-      <section style={{
-        background: '#A51C1C',
-        minHeight: '750px',
-        position: 'relative',
-        overflow: 'visible',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 80px',
-      }}>
+      <section className="hero-section">
         {/* Radial glow */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -226,36 +310,15 @@ export default function Home() {
         ))}
 
         {/* ── Burger Image ── */}
-        <div style={{
-          flex: '1',
-          display: 'flex',
-          justifyContent: 'flex-start',
-          alignItems: 'center',
-          position: 'relative',
-          top: '80px',
-          left: '20px',
-          zIndex: 10,
-          minWidth: '650px',
-          height: '500px',
-        }}>
-          {/* Design Image on top, right side */}
+        <div className="hero-image-wrapper">
           <motion.img
             src={designImg}
             alt="Design"
-            style={{
-              position: 'absolute',
-              right: '120px',
-              top: '-20px',
-              width: '150px',
-              height: 'auto',
-              zIndex: 20,
-            }}
+            className="design-img"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.8 }}
           />
-
-          {/* Burger Image */}
           <motion.img
             className="burger-img"
             src={burgerImg}
@@ -263,34 +326,17 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4, duration: 0.9, type: 'spring', stiffness: 70 }}
-            style={{
-              width: '100%',
-              maxWidth: '650px',
-              height: 'auto',
-            }}
           />
         </div>
 
         {/* ── Hero Content ── */}
-        <div className="hero-content" style={{
-          flex: '0 0 500px',
-          maxWidth: '600px',
-        }}>
-          <motion.h1 
+        <div className="hero-content">
+          <motion.h1
+            className="hero-title"
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            style={{
-              fontSize: 'clamp(50px, 8vw, 110px)',
-              fontWeight: '900',
-              color: '#FFD700',
-              lineHeight: 0.95,
-              fontFamily: 'cursive, "Brush Script MT", "Comic Sans MS", "Bradley Hand", sans-serif',
-              textShadow: '4px 4px 0px rgba(0,0,0,0.4)',
-              margin: '0 0 25px',
-              letterSpacing: '2px',
-              transform: 'rotate(-2deg)',
-            }}>
+          >
             {(() => {
               const text = t('heroTitle');
               const firstSpace = text.indexOf(' ');
@@ -300,85 +346,45 @@ export default function Home() {
               return (
                 <>
                   {firstWord}{' '}
-                  <Clock size={70} strokeWidth={3} color="#FFD700" style={{ display: 'inline-block', marginRight: '15px', marginLeft: '15px', verticalAlign: 'middle' }} />
+                  <Clock className="hero-clock-icon" strokeWidth={3} color="#FFD700" style={{ display: 'inline-block', verticalAlign: 'middle', margin: '0 6px' }} />
                   {rest}
                 </>
               );
             })()}
           </motion.h1>
           {/* CTA buttons */}
-          <div className="hero-buttons" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+          <div className="hero-buttons">
             <motion.button
-                whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.97 }}
-                onClick={() => setIsLocationModalOpen(true)}
-                style={{
-                  background: '#FFD700', color: '#000',
-                  padding: '16px 50px', borderRadius: '20px', border: 'none',
-                  fontWeight: '900', fontSize: '15px', cursor: 'pointer',
-                  boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
-                  display: 'flex', alignItems: 'center', gap: '9px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <MapPin size={17} /> {t('heroBtn')}
-              </motion.button>
+              whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.97 }}
+              onClick={() => setIsLocationModalOpen(true)}
+              style={{
+                background: '#FFD700', color: '#000',
+                padding: '16px 40px', borderRadius: '20px', border: 'none',
+                fontWeight: '900', fontSize: '15px', cursor: 'pointer',
+                boxShadow: '0 12px 30px rgba(0,0,0,0.2)',
+                display: 'flex', alignItems: 'center', gap: '9px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <MapPin size={17} /> {t('heroBtn')}
+            </motion.button>
           </div>
         </div>
       </section>
 
-      {/* Double Wave Divider (exactly like reference) */}
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        marginTop: '-100px',
-        zIndex: 5,
-      }}>
-        {/* Top Subtle Wave */}
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          viewBox="0 0 1440 100" 
-          preserveAspectRatio="none" 
-          style={{ 
-            width: '100%', 
-            height: '100px', 
-            display: 'block',
-            position: 'absolute',
-            top: '0',
-            left: '0',
-            opacity: '0.5'
-          }}
-        >
-          <path 
-            d="M0,20 C360,50 720,50 1080,50 C1260,50 1350,20 1440,20 L1440,100 L0,100 Z" 
-            fill="#fff" 
-          />
-        </svg>
-
-        {/* Bottom Main Wave */}
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          viewBox="0 0 1440 100" 
-          preserveAspectRatio="none" 
-          style={{ 
-            width: '100%', 
-            height: '100px', 
-            display: 'block',
-            position: 'relative',
-            top: '0'
-          }}
-        >
-          <path 
-            d="M0,0 C360,30 720,30 1080,30 C1260,30 1350,0 1440,0 L1440,100 L0,100 Z" 
-            fill="#fff" 
-          />
+      {/* Wave Divider */}
+      <div style={{ position: 'relative', width: '100%', marginTop: '-2px', zIndex: 5, lineHeight: 0 }}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 80" preserveAspectRatio="none"
+          style={{ width: '100%', height: 'clamp(40px, 6vw, 80px)', display: 'block' }}>
+          <path d="M0,0 C360,60 720,60 1080,60 C1260,60 1350,20 1440,0 L1440,80 L0,80 Z" fill="#fff" />
         </svg>
       </div>
 
       {/* Rest of page */}
-      <div style={{ paddingTop: '140px', paddingBottom: '100px' }}>
+      <div style={{ paddingTop: 'clamp(20px, 4vw, 60px)', paddingBottom: '100px' }}>
 
         {/* ── PROMO SECTION — text left + image right ── */}
-        <section style={{ padding: '80px 40px', background: '#fff' }}>
+        <section style={{ padding: 'clamp(40px, 6vw, 80px) clamp(16px, 4vw, 40px)', background: '#fff' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '60px', flexWrap: 'wrap' }}>
             {/* LEFT — text */}
             <motion.div

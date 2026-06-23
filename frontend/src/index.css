@@ -43,6 +43,12 @@ body {
   padding: 0 20px;
 }
 
+@media (max-width: 480px) {
+  .container {
+    padding: 0 14px;
+  }
+}
+
 button {
   font-family: 'Outfit', sans-serif;
   transition: all 0.3s ease;

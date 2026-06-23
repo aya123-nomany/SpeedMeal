@@ -137,70 +137,126 @@ const Navbar = () => {
 
   return (
     <>
-      <header style={{
-        width: '100%',
-        position: 'absolute',
-        top: '20px',
-        zIndex: 1000,
-        padding: '0 20px'
-      }}>
-        <nav style={{
-          background: '#fff',
-          borderRadius: '999px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
-          maxWidth: '1300px',
-          margin: '0 auto',
-          padding: '0 25px',
-          height: '90px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          {/* Left Side: Hamburger & Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
-            <button 
+      <style>{`
+        .navbar-root {
+          width: 100%;
+          position: absolute;
+          top: 12px;
+          z-index: 1000;
+          padding: 0 12px;
+          box-sizing: border-box;
+          left: 0;
+          right: 0;
+        }
+        .navbar-inner {
+          background: #fff;
+          border-radius: 999px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+          max-width: 1300px;
+          margin: 0 auto;
+          padding: 0 20px;
+          height: 64px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        .navbar-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-shrink: 0;
+          min-width: 0;
+        }
+        .navbar-center {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          margin: 0 auto;
+        }
+        .navbar-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+        .navbar-logo {
+          height: 58px;
+          object-fit: contain;
+          display: block;
+        }
+        .navbar-lang-select {
+          background: #f8fafc;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 7px 10px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #1e293b;
+          cursor: pointer;
+          outline: none;
+          font-family: 'Outfit', sans-serif;
+        }
+
+        /* ── Mobile (≤900px) ── */
+        @media (max-width: 900px) {
+          .navbar-root { top: 8px; padding: 0 10px; }
+          .navbar-inner { height: 56px; padding: 0 14px; }
+          .navbar-center { display: none !important; }
+          .navbar-right-desktop { display: none !important; }
+          .navbar-right-mobile { display: flex !important; }
+          .navbar-logo { height: 48px; }
+        }
+        @media (min-width: 901px) {
+          .navbar-right-mobile { display: none !important; }
+        }
+        @media (max-width: 380px) {
+          .navbar-root { padding: 0 8px; }
+          .navbar-inner { height: 52px; padding: 0 10px; }
+          .navbar-logo { height: 42px; }
+          .navbar-left { gap: 8px; }
+        }
+      `}</style>
+
+      <header className="navbar-root">
+        <nav className="navbar-inner">
+          {/* Left: Hamburger + Logo */}
+          <div className="navbar-left">
+            <button
               onClick={() => setIsOpen(true)}
-              style={{ background: 'none', border: 'none', padding: '10px', cursor: 'pointer', color: '#334155' }}
+              style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center' }}
             >
-              <MenuIcon size={30} />
+              <MenuIcon size={26} />
             </button>
             <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <img src={logoUrl} alt="SpeedMeal" style={{ height: '75px', objectFit: 'contain' }} />
+              <img src={logoUrl} alt="SpeedMeal" className="navbar-logo" />
             </Link>
           </div>
 
-          {/* Center Side: Partner Links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '30px', margin: '0 auto' }}>
-            <Link to="/delivery" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#ef4444', fontWeight: '600', fontSize: '15px' }}>
-              <div style={{ background: '#fef2f2', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Bike size={20} />
+          {/* Center: Partner links (desktop only) */}
+          <div className="navbar-center">
+            <Link to="/delivery" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#ef4444', fontWeight: '600', fontSize: '14px' }}>
+              <div style={{ background: '#fef2f2', padding: '7px', borderRadius: '10px', display: 'flex' }}>
+                <Bike size={18} />
               </div>
               <span>{t('navCourier')}</span>
             </Link>
-            <Link to="/partner" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#ef4444', fontWeight: '600', fontSize: '15px' }}>
-              <div style={{ background: '#fef2f2', padding: '8px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Store size={20} />
+            <Link to="/partner" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: '#ef4444', fontWeight: '600', fontSize: '14px' }}>
+              <div style={{ background: '#fef2f2', padding: '7px', borderRadius: '10px', display: 'flex' }}>
+                <Store size={18} />
               </div>
               <span>{t('navPartner')}</span>
             </Link>
           </div>
 
-          {/* Right Side: Auth Actions & Language Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {/* Right: Desktop full actions */}
+          <div className="navbar-right navbar-right-desktop">
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              style={{
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '8px 12px',
-                fontSize: '14px',
-                fontWeight: '700',
-                color: '#1e293b',
-                cursor: 'pointer',
-                outline: 'none',
-              }}
+              className="navbar-lang-select"
             >
               <option value="fr">🇫🇷 FR</option>
               <option value="en">🇬🇧 EN</option>
@@ -209,75 +265,81 @@ const Navbar = () => {
 
             {isLoggedIn && (!storedUser || storedUser.role === 'client') && (
               <Link to="/checkout" style={{
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '50%',
-                width: '46px',
-                height: '46px',
-                color: '#1e293b',
-                transition: 'all 0.2s',
-                textDecoration: 'none',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#A51C1C'; e.currentTarget.style.color = '#A51C1C'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#1e293b'; }}
-              >
-                <ShoppingCart size={20} />
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '50%',
+                width: '44px', height: '44px', color: '#1e293b', textDecoration: 'none',
+              }}>
+                <ShoppingCart size={19} />
                 {count > 0 && (
                   <span style={{
-                    position: 'absolute',
-                    top: '-5px',
-                    right: '-5px',
-                    background: '#ef4444',
-                    color: '#fff',
-                    borderRadius: '50%',
-                    fontSize: '10px',
-                    fontWeight: '800',
-                    width: '18px',
-                    height: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 5px rgba(239,68,68,0.4)',
-                  }}>
-                    {count}
-                  </span>
+                    position: 'absolute', top: '-5px', right: '-5px',
+                    background: '#ef4444', color: '#fff', borderRadius: '50%',
+                    fontSize: '10px', fontWeight: '800', width: '18px', height: '18px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{count}</span>
                 )}
               </Link>
             )}
+
             {isLoggedIn ? (
               <>
-                <Link to={dashboardPath} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b', textDecoration: 'none', fontWeight: '700', fontSize: '15px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#A51C1C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <User size={18} color="#fff" />
+                <Link to={dashboardPath} style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#1e293b', textDecoration: 'none', fontWeight: '700', fontSize: '14px' }}>
+                  <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#A51C1C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={16} color="#fff" />
                   </div>
                   <span>{storedUser?.name?.split(' ')[0]}</span>
                 </Link>
-                <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff0f0', border: 'none', color: '#A51C1C', padding: '10px 18px', borderRadius: '999px', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>
-                  <LogOut size={15} /> {t('navLogout')}
+                <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '7px', background: '#fff0f0', border: 'none', color: '#A51C1C', padding: '9px 16px', borderRadius: '999px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', fontFamily: 'Outfit, sans-serif' }}>
+                  <LogOut size={14} /> {t('navLogout')}
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" style={{ color: '#1e293b', textDecoration: 'none', fontWeight: '700', fontSize: '15px' }}>
+                <Link to="/login" style={{ color: '#1e293b', textDecoration: 'none', fontWeight: '700', fontSize: '14px' }}>
                   {t('navLogin')}
                 </Link>
-                <Link to="/signup" style={{ 
-                  background: '#1e293b', 
-                  color: '#fff', 
-                  padding: '12px 28px', 
-                  borderRadius: '999px', 
-                  textDecoration: 'none', 
-                  fontWeight: '700', 
-                  fontSize: '15px',
-                  transition: '0.3s'
-                }} onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}>
+                <Link to="/signup" style={{
+                  background: '#1e293b', color: '#fff', padding: '11px 24px',
+                  borderRadius: '999px', textDecoration: 'none', fontWeight: '700', fontSize: '14px',
+                }}>
                   {t('navSignup')}
                 </Link>
               </>
+            )}
+          </div>
+
+          {/* Right: Mobile — only cart + user icon */}
+          <div className="navbar-right navbar-right-mobile" style={{ display: 'none', alignItems: 'center', gap: '10px' }}>
+            {isLoggedIn && (!storedUser || storedUser.role === 'client') && (
+              <Link to="/checkout" style={{
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '50%',
+                width: '40px', height: '40px', color: '#1e293b', textDecoration: 'none', flexShrink: 0,
+              }}>
+                <ShoppingCart size={18} />
+                {count > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '-4px', right: '-4px',
+                    background: '#ef4444', color: '#fff', borderRadius: '50%',
+                    fontSize: '9px', fontWeight: '800', width: '16px', height: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{count}</span>
+                )}
+              </Link>
+            )}
+            {isLoggedIn ? (
+              <Link to={dashboardPath} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#A51C1C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <User size={16} color="#fff" />
+                </div>
+              </Link>
+            ) : (
+              <Link to="/login" style={{
+                background: '#1e293b', color: '#fff', padding: '8px 16px',
+                borderRadius: '999px', textDecoration: 'none', fontWeight: '700', fontSize: '13px', whiteSpace: 'nowrap',
+              }}>
+                {t('navLogin')}
+              </Link>
             )}
           </div>
         </nav>

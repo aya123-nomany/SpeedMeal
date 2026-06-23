@@ -43,13 +43,13 @@ const FeaturesSection = () => {
   }, []);
 
   return (
-    <section style={{ padding: '100px 0', background: '#fff9e6', borderRadius: '50px', margin: '0 20px' }}>
+    <section style={{ padding: 'clamp(50px, 8vw, 100px) 0', background: '#fff9e6', borderRadius: 'clamp(20px, 4vw, 50px)', margin: '0 clamp(8px, 2vw, 20px)' }}>
       <div className="container">
         <h2 style={{ 
-          fontSize: '36px', 
+          fontSize: 'clamp(24px, 3.5vw, 36px)', 
           fontWeight: '950', 
           textAlign: 'center', 
-          marginBottom: '80px',
+          marginBottom: 'clamp(40px, 6vw, 80px)',
           color: '#111'
         }}>
           Chill At Home We Will <span style={{ color: '#A51C1C' }}>Take Care</span>
@@ -57,8 +57,8 @@ const FeaturesSection = () => {
         
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '40px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '30px',
           justifyItems: 'center'
         }}>
           <FeatureItem 

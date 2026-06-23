@@ -86,8 +86,8 @@ const CategoriesSection = () => {
   return (
     <section style={{ padding: '80px 0', background: '#fff' }}>
       <div className="container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '50px' }}>
-          <h2 style={{ fontSize: '36px', fontWeight: '950', color: '#111', lineHeight: '1.2' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '50px', flexWrap: 'wrap', gap: '16px' }}>
+          <h2 style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: '950', color: '#111', lineHeight: '1.2' }}>
             Best <span style={{ color: '#A51C1C' }}>Delivered</span> <br /> Categories
           </h2>
           <p style={{ color: '#888', maxWidth: '200px', fontSize: '13px', textAlign: 'right', fontWeight: '500' }}>
@@ -97,8 +97,8 @@ const CategoriesSection = () => {
         
         <div style={{ 
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: '30px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: '24px',
           justifyItems: 'center'
         }}>
           {(showAll ? categories : categories.slice(0, 6)).map((cat, i) => (
